@@ -143,12 +143,41 @@ class QwenTTSEngine(TTSEngineProtocol):
         self._lock = threading.Lock()
         self._unload_timer: threading.Timer | None = None
 
+        # Calibrated seconds per character (measured on first synthesis)
+        self._seconds_per_char: float | None = None
+
         # Model will be loaded on first request (lazy loading)
         self.model = None
 
         # Load model immediately if no idle timeout (always keep loaded)
         if idle_timeout == 0:
             self._load_model()
+
+    @property
+    def seconds_per_char(self) -> float | None:
+        """Return calibrated seconds per character, or None if not yet measured."""
+        return self._seconds_per_char
+
+    def calibrate(self, test_text: str = "Hello, this is a calibration test.") -> float:
+        """Run a calibration test to measure seconds per character.
+
+        Args:
+            test_text: Short text to use for calibration.
+
+        Returns:
+            Measured seconds per character.
+        """
+        self._ensure_model_loaded()
+
+        start = time.time()
+        # Consume the generator to complete synthesis
+        for _ in self.synthesize(test_text):
+            pass
+        elapsed = time.time() - start
+
+        self._seconds_per_char = elapsed / len(test_text)
+        print(f"⏱️  Calibrated: {self._seconds_per_char:.4f}s per character")
+        return self._seconds_per_char
 
     def _load_model(self) -> None:
         """Load the model onto GPU or CPU."""

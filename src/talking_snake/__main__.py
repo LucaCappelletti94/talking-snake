@@ -99,6 +99,13 @@ def main() -> int:
         return 1
 
     print("✅ TTS model loaded!")
+
+    # Run calibration to get accurate time estimates
+    print("⏱️  Calibrating speech timing...")
+    try:
+        tts_engine.calibrate()
+    except Exception as e:
+        print(f"⚠️  Calibration failed (using defaults): {e}")
     print()
 
     # Create app with engine

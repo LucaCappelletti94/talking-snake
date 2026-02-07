@@ -461,9 +461,7 @@ async def stream_device_info() -> StreamingResponse:
     )
 
 
-def _estimate_time(
-    text: str, seconds_per_char: float = INITIAL_SECONDS_PER_CHAR
-) -> tuple[int, float]:
+def _estimate_time(text: str, seconds_per_char: float | None = None) -> tuple[int, float]:
     """Estimate processing time for text.
 
     Args:
@@ -473,6 +471,8 @@ def _estimate_time(
     Returns:
         Tuple of (chunk_count, estimated_seconds).
     """
+    if seconds_per_char is None:
+        seconds_per_char = INITIAL_SECONDS_PER_CHAR
     # Count chunks (500 chars per chunk approximately)
     chunk_count = max(1, len(text) // 500 + (1 if len(text) % 500 else 0))
     estimated_seconds = len(text) * seconds_per_char
@@ -578,8 +578,8 @@ def _generate_audio_to_job(
     total_chunks = len(chunks) if chunks else 1
     total_chars = sum(len(c) for c in chunks)
 
-    # Use initial estimate before calibration
-    seconds_per_char = INITIAL_SECONDS_PER_CHAR
+    # Use calibrated estimate if available, otherwise initial estimate
+    seconds_per_char = getattr(tts_engine, "seconds_per_char", None) or INITIAL_SECONDS_PER_CHAR
     estimated_total = total_chars * seconds_per_char
 
     # Send initial progress event with job_id and batch info
@@ -589,7 +589,7 @@ def _generate_audio_to_job(
         "current": 0,
         "total": total_chunks,
         "percent": 0,
-        "estimated_remaining": estimated_total,
+        "estimated_remaining": round(estimated_total, 1),
         "batch_size": batch_size,
         "doc_name": doc_name,
         "doc_type": doc_type,

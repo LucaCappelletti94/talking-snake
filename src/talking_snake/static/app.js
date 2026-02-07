@@ -32,6 +32,7 @@ const progressSlider = document.getElementById("progressSlider");
 const timeDisplay = document.getElementById("timeDisplay");
 const volumeBtn = document.getElementById("volumeBtn");
 const downloadBtn = document.getElementById("downloadBtn");
+const deleteBtn = document.getElementById("deleteBtn");
 
 // Constants
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -229,8 +230,9 @@ async function fetchAudioBlob(jobId) {
         const response = await fetch(`/api/audio/${jobId}`);
         if (response.ok) {
             currentAudioBlob = await response.blob();
-            // Show download button
+            // Show download and delete buttons
             downloadBtn.classList.remove("hidden");
+            deleteBtn.classList.remove("hidden");
         }
     } catch (error) {
         console.error("Failed to fetch audio for download:", error);
@@ -259,6 +261,35 @@ function downloadAudio() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+/**
+ * Delete the current audio and reset the player
+ */
+function deleteAudio() {
+    // Stop and reset audio
+    audio.pause();
+    audio.src = "";
+    audio.currentTime = 0;
+
+    // Clear state
+    currentAudioBlob = null;
+    currentDocName = "";
+    estimatedDuration = 0;
+
+    // Hide player and buttons
+    player.classList.remove("visible");
+    downloadBtn.classList.add("hidden");
+    deleteBtn.classList.add("hidden");
+
+    // Reset progress
+    progressBar.style.width = "0%";
+    progressSlider.value = 0;
+    timeDisplay.textContent = "0:00 / 0:00";
+    updatePlayButton();
+
+    // Show input section again
+    inputSection.classList.remove("hidden");
 }
 
 /**
@@ -754,6 +785,9 @@ pauseBtn.addEventListener("click", togglePause);
 
 // Download button
 downloadBtn.addEventListener("click", downloadAudio);
+
+// Delete button
+deleteBtn.addEventListener("click", deleteAudio);
 
 // Update pause button when audio state changes
 audio.addEventListener("play", updatePauseButton);

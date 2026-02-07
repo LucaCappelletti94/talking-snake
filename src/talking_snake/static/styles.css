@@ -245,12 +245,13 @@ h1 {
     width: 36px;
     height: 36px;
     padding: 0;
-    color: white;
-    border: none;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -261,27 +262,19 @@ h1 {
 }
 
 .control-btn:hover {
-    filter: brightness(1.1);
-}
-
-.pause-btn {
-    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
+    color: var(--primary);
+    border-color: var(--primary);
+    background: rgb(212, 118, 58, 0.08);
 }
 
 .pause-btn:hover {
-    animation: gradient-shift 0.8s ease infinite;
-}
-
-.stop-btn {
-    background: linear-gradient(135deg, var(--error), #8b3a30, var(--error));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
+    color: var(--primary);
 }
 
 .stop-btn:hover {
-    animation: gradient-shift 0.8s ease infinite;
+    color: var(--error);
+    border-color: var(--error);
+    background: rgb(196, 90, 74, 0.08);
 }
 
 @keyframes gradient-idle {
@@ -438,29 +431,26 @@ h1 {
 .submit-btn {
     width: 100%;
     padding: 0.6rem 1rem;
-    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
-    color: white;
-    border: none;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
     border-radius: 8px;
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 500;
-    transition: filter 0.15s ease;
+    transition: all 0.2s ease;
     margin-bottom: 0.5rem;
 }
 
 .submit-btn:hover {
-    filter: brightness(1.1);
-    animation: gradient-shift 0.8s ease infinite;
+    color: var(--primary);
+    border-color: var(--primary);
+    background: rgb(212, 118, 58, 0.08);
 }
 
 .submit-btn:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
-    filter: none;
-    animation: none;
 }
 
 .url-form .hint {
@@ -477,20 +467,20 @@ input[type="file"] {
 .file-label {
     display: inline-block;
     padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
-    color: white;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
     font-size: 0.9rem;
-    transition: filter 0.15s ease;
+    transition: all 0.2s ease;
 }
 
 .file-label:hover {
-    filter: brightness(1.1);
-    animation: gradient-shift 0.8s ease infinite;
+    color: var(--primary);
+    border-color: var(--primary);
+    background: rgb(212, 118, 58, 0.08);
 }
 
 /* Device Info - Subtle footer-like display */
@@ -590,31 +580,32 @@ input[type="file"] {
 .player-btn {
     width: 36px;
     height: 36px;
-    border: none;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
-    color: white;
+    background: var(--surface);
+    color: var(--text-muted);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.85rem;
-    transition: filter 0.15s ease;
+    transition: all 0.2s ease;
     flex-shrink: 0;
 }
 
 .player-btn:hover {
-    filter: brightness(1.1);
-    animation: gradient-shift 0.8s ease infinite;
+    color: var(--primary);
+    border-color: var(--primary);
+    background: rgb(212, 118, 58, 0.08);
+}
+
+.player-btn.play-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 0.9rem;
 }
 
 .player-btn.volume-btn {
-    background: linear-gradient(135deg, var(--bg), #252540, var(--bg));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
-    color: var(--text-muted);
     width: 32px;
     height: 32px;
     font-size: 0.8rem;
@@ -622,14 +613,9 @@ input[type="file"] {
 
 .player-btn.volume-btn:hover {
     color: var(--text);
-    animation: gradient-shift 0.8s ease infinite;
 }
 
 .player-btn.download-btn {
-    background: linear-gradient(135deg, var(--bg), #252540, var(--bg));
-    background-size: 200% 200%;
-    animation: gradient-idle 3s ease infinite;
-    color: var(--text-muted);
     width: 32px;
     height: 32px;
     font-size: 0.8rem;
@@ -637,7 +623,18 @@ input[type="file"] {
 
 .player-btn.download-btn:hover {
     color: var(--primary);
-    animation: gradient-shift 0.8s ease infinite;
+}
+
+.player-btn.delete-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+}
+
+.player-btn.delete-btn:hover {
+    color: var(--error);
+    border-color: var(--error);
+    background: rgb(196, 90, 74, 0.08);
 }
 
 .progress-container {
