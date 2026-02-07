@@ -231,20 +231,29 @@ audio.addEventListener("playing", () => {
 });
 
 /**
- * Fetch audio blob from the server for download capability
+ * Fetch audio blob from the server, store for download, and start playback
  * @param {string} jobId - The job ID for the audio
  */
-async function fetchAudioBlob(jobId) {
+async function fetchAndPlayAudio(jobId) {
     try {
         const response = await fetch(`/api/audio/${jobId}`);
         if (response.ok) {
             currentAudioBlob = await response.blob();
+            // Create blob URL for playback
+            const blobUrl = URL.createObjectURL(currentAudioBlob);
+            audio.src = blobUrl;
+            audio.load();
+            // Try to play (may need user interaction first time)
+            audio.play().catch(() => {
+                // Autoplay blocked - will play when user clicks
+            });
+            updatePlayButton();
             // Show download and delete buttons
             downloadBtn.classList.remove("hidden");
             deleteBtn.classList.remove("hidden");
         }
     } catch (error) {
-        console.error("Failed to fetch audio for download:", error);
+        console.error("Failed to fetch audio:", error);
     }
 }
 
@@ -276,29 +285,37 @@ function downloadAudio() {
  * Delete the current audio and reset the player
  */
 function deleteAudio() {
-    // Stop and reset audio
+    // Stop audio immediately
     audio.pause();
-    audio.src = "";
-    audio.currentTime = 0;
 
-    // Clear state
-    currentAudioBlob = null;
-    currentDocName = "";
-    estimatedDuration = 0;
+    // Add deleting animation
+    player.classList.add("deleting");
 
-    // Hide player and buttons
-    player.classList.remove("visible");
-    downloadBtn.classList.add("hidden");
-    deleteBtn.classList.add("hidden");
+    // Wait for animation to complete
+    setTimeout(() => {
+        // Reset audio
+        audio.src = "";
+        audio.currentTime = 0;
 
-    // Reset progress
-    progressBar.style.width = "0%";
-    progressSlider.value = 0;
-    timeDisplay.textContent = "0:00 / 0:00";
-    updatePlayButton();
+        // Clear state
+        currentAudioBlob = null;
+        currentDocName = "";
+        estimatedDuration = 0;
 
-    // Show input section again
-    inputSection.classList.remove("hidden");
+        // Hide player and buttons
+        player.classList.remove("visible", "deleting");
+        downloadBtn.classList.add("hidden");
+        deleteBtn.classList.add("hidden");
+
+        // Reset progress
+        progressBar.style.width = "0%";
+        progressSlider.value = 0;
+        timeDisplay.textContent = "0:00 / 0:00";
+        updatePlayButton();
+
+        // Show input section again
+        inputSection.classList.remove("hidden");
+    }, 300);
 }
 
 /**
@@ -434,8 +451,7 @@ async function processStream(response, docName) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let lastStatus = "";
-    let jobId = null;
-    let audioStarted = false;
+    let audioJobId = null;
 
     // Reset estimated duration
     estimatedDuration = 0;
@@ -459,25 +475,17 @@ async function processStream(response, docName) {
                             throw new Error(data.message || "TTS generation failed");
                         } else if (data.type === "start" && data.job_id) {
                             // Got job ID - start audio stream immediately
-                            jobId = data.job_id;
+                            const jobId = data.job_id;
                             // Capture initial duration estimate
                             if (data.estimated_remaining) {
                                 estimatedDuration = data.estimated_remaining;
                             }
                             // Display document info
                             updateDocInfo(data);
-                            if (!audioStarted) {
-                                audioStarted = true;
-                                // Set audio source to stream endpoint
-                                // Browser will start playing as data arrives
-                                audio.src = `/api/audio/${jobId}`;
-                                audio.load();
-                                // Try to play (may need user interaction first time)
-                                audio.play().catch(() => {
-                                    // Autoplay blocked - will play when user clicks
-                                });
-                                updatePlayButton();
-                                // Pause button will be shown by the 'playing' event listener
+                            if (!audioJobId) {
+                                audioJobId = jobId;
+                                // Fetch audio as blob so we can both play and download
+                                fetchAndPlayAudio(jobId);
                             }
                             const timeStr = formatTimeRemaining(data.estimated_remaining);
                             showStatus(
@@ -514,11 +522,6 @@ async function processStream(response, docName) {
                                 "success"
                             );
                             updatePlayerProgress();
-
-                            // Fetch audio blob for download capability
-                            if (jobId) {
-                                fetchAudioBlob(jobId);
-                            }
                         }
                     } catch (parseError) {
                         // Check if it's our thrown error or a JSON parse error
