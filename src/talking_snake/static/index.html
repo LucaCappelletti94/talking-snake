@@ -67,18 +67,17 @@
                     <div class="drop-zone" id="dropZone">
                         <i class="fa-solid fa-file-pdf drop-icon"></i>
                         <p>Drag & drop a PDF here</p>
-                        <label class="file-label">
-                            <i class="fa-solid fa-folder-open"></i> Choose File
-                            <input type="file" id="fileInput" accept=".pdf">
-                        </label>
+                        <input type="file" id="fileInput" accept=".pdf" class="hidden-file-input">
                         <p class="hint">Supports PDF documents up to 50MB</p>
                     </div>
                 </div>
 
                 <div class="tab-content" id="url-tab">
                     <div class="url-form">
-                        <input type="url" id="urlInput" placeholder="https://example.com/article or .pdf">
-                        <button class="submit-btn" id="urlSubmit"><i class="fa-solid fa-microphone"></i> Read Content</button>
+                        <div class="url-input-row">
+                            <input type="url" id="urlInput" placeholder="https://example.com/article or .pdf">
+                            <button class="submit-btn" id="urlSubmit"><i class="fa-solid fa-microphone"></i></button>
+                        </div>
                         <p class="hint">Enter a link to a PDF or web page (articles, docs, blogs)</p>
                     </div>
                 </div>
@@ -121,9 +120,6 @@
                         <input type="range" class="progress-slider" id="progressSlider" min="0" max="100" value="0">
                     </div>
                     <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
-                    <button class="player-btn volume-btn" id="volumeBtn" title="Mute/Unmute">
-                        <i class="fa-solid fa-volume-high"></i>
-                    </button>
                     <button class="player-btn download-btn hidden" id="downloadBtn" title="Download Audio">
                         <i class="fa-solid fa-download"></i>
                     </button>

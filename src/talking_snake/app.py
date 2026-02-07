@@ -436,6 +436,8 @@ def _get_device_info() -> dict:
     if _tts_engine is not None:
         info["batch_size"] = getattr(_tts_engine, "batch_size", 1)
         info["chunk_size"] = getattr(_tts_engine, "chunk_size", 800)
+        # Include model state
+        info["model_state"] = getattr(_tts_engine, "model_state", "unknown")
         # Include timing stats
         seconds_per_char = getattr(_tts_engine, "seconds_per_char", None)
         if seconds_per_char is not None:

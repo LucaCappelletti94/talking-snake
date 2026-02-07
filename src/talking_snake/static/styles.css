@@ -367,6 +367,38 @@ h1 {
     padding: 1rem;
 }
 
+.url-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.url-input-row input[type="url"] {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+    transition: border-color 0.15s ease;
+}
+
+.url-input-row input[type="url"]:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.url-input-row input[type="url"]::placeholder {
+    color: var(--text-muted);
+}
+
+.url-input-row .submit-btn {
+    padding: 0.6rem 1rem;
+    margin: 0;
+    flex-shrink: 0;
+}
+
 .url-form input[type="url"] {
     width: 100%;
     padding: 0.6rem 0.75rem;
@@ -464,6 +496,10 @@ input[type="file"] {
     display: none;
 }
 
+.hidden-file-input {
+    display: none !important;
+}
+
 .file-label {
     display: inline-block;
     padding: 0.5rem 1rem;
@@ -537,6 +573,36 @@ input[type="file"] {
 
 .device-timing i {
     font-size: 0.6rem;
+}
+
+/* Model state indicators */
+.model-state {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+}
+
+.model-state i {
+    font-size: 0.55rem;
+}
+
+.model-loaded {
+    background: rgb(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+.model-loading,
+.model-unloading {
+    background: rgb(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.model-unloaded {
+    background: rgb(107, 114, 128, 0.15);
+    color: var(--text-muted);
 }
 
 .device-batch {

@@ -30,7 +30,6 @@ const playerPlayBtn = document.getElementById("playerPlayBtn");
 const progressBar = document.getElementById("progressBar");
 const progressSlider = document.getElementById("progressSlider");
 const timeDisplay = document.getElementById("timeDisplay");
-const volumeBtn = document.getElementById("volumeBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const deleteBtn = document.getElementById("deleteBtn");
 
@@ -42,7 +41,6 @@ let currentAbortController = null;
 let selectedLanguage = "english";
 let isPaused = false;
 let estimatedDuration = 0; // Estimated total duration from server
-let isMuted = false;
 let currentAudioBlob = null; // Store audio blob for download
 let currentDocName = ""; // Store document name for download filename
 
@@ -153,13 +151,39 @@ function updatePlayButton() {
 }
 
 /**
- * Toggle mute
+ * Get HTML for model state indicator
+ * @param {string} state - Model state: loaded, loading, unloaded, unloading
+ * @returns {string} HTML string for the model state indicator
  */
-function toggleMute() {
-    isMuted = !isMuted;
-    audio.muted = isMuted;
-    const icon = volumeBtn.querySelector("i");
-    icon.className = isMuted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
+function getModelStateHtml(state) {
+    const stateConfig = {
+        loaded: {
+            icon: "fa-circle-check",
+            class: "model-loaded",
+            text: "Model loaded",
+            tooltip: "TTS model is loaded in memory and ready for inference"
+        },
+        loading: {
+            icon: "fa-spinner fa-spin",
+            class: "model-loading",
+            text: "Loading...",
+            tooltip: "TTS model is being loaded into memory"
+        },
+        unloaded: {
+            icon: "fa-circle-xmark",
+            class: "model-unloaded",
+            text: "Model unloaded",
+            tooltip: "TTS model is not loaded (will load on first request)"
+        },
+        unloading: {
+            icon: "fa-spinner fa-spin",
+            class: "model-unloading",
+            text: "Unloading...",
+            tooltip: "TTS model is being unloaded from memory"
+        }
+    };
+    const config = stateConfig[state] || stateConfig.unloaded;
+    return `<span class="model-state ${config.class}" title="${config.tooltip}"><i class="fa-solid ${config.icon}"></i> ${config.text}</span>`;
 }
 
 /**
@@ -168,23 +192,29 @@ function toggleMute() {
  */
 function updateDeviceInfo(info) {
     const icon = info.device === "cuda" ? "fa-microchip" : "fa-server";
+    const deviceTooltip = info.device === "cuda"
+        ? "GPU accelerated inference for faster audio generation"
+        : "CPU-based inference (slower than GPU)";
     const gpuMemoryInfo = info.device === "cuda"
-        ? `<span class="device-memory"><i class="fa-solid fa-memory"></i> GPU: ${info.memory_used_gb}/${info.memory_total_gb}GB</span>`
+        ? `<span class="device-memory" title="GPU memory used for model and inference"><i class="fa-solid fa-memory"></i> GPU: ${info.memory_used_gb}/${info.memory_total_gb}GB</span>`
         : "";
-    const ramInfo = `<span class="device-memory"><i class="fa-solid fa-memory"></i> RAM: ${info.ram_used_gb}/${info.ram_total_gb}GB</span>`;
-    const diskInfo = `<span class="device-memory"><i class="fa-solid fa-hard-drive"></i> ${info.disk_free_gb}GB free</span>`;
+    const ramInfo = `<span class="device-memory" title="System RAM usage"><i class="fa-solid fa-memory"></i> RAM: ${info.ram_used_gb}/${info.ram_total_gb}GB</span>`;
+    const diskInfo = `<span class="device-memory" title="Available disk space for temporary files"><i class="fa-solid fa-hard-drive"></i> ${info.disk_free_gb}GB free</span>`;
     // Show timing stats if available
     const timingInfo = info.seconds_per_char !== undefined
-        ? `<span class="device-timing"><i class="fa-solid fa-stopwatch"></i> ${info.seconds_per_char.toFixed(4)}s/char${info.total_chars_processed ? ` (${info.total_chars_processed.toLocaleString()} chars)` : ""}</span>`
+        ? `<span class="device-timing" title="Average time to generate audio per character of text${info.total_chars_processed ? `, based on ${info.total_chars_processed.toLocaleString()} characters processed` : ""}"><i class="fa-solid fa-stopwatch"></i> ${info.seconds_per_char.toFixed(4)}s/char${info.total_chars_processed ? ` (${info.total_chars_processed.toLocaleString()} chars)` : ""}</span>`
         : "";
+    // Show model state
+    const modelStateInfo = getModelStateHtml(info.model_state);
     deviceInfo.innerHTML = `
-        <i class="fa-solid ${icon}"></i>
-        <span>${info.device_name}</span>
+        <i class="fa-solid ${icon}" title="${deviceTooltip}"></i>
+        <span title="${deviceTooltip}">${info.device_name}</span>
+        ${modelStateInfo}
         ${gpuMemoryInfo}
         ${ramInfo}
         ${diskInfo}
         ${timingInfo}
-        <span class="device-ephemeral"><i class="fa-solid fa-shield-halved"></i> No files stored</span>
+        <span class="device-ephemeral" title="Your documents are processed in memory only. Nothing is saved to disk or stored after processing."><i class="fa-solid fa-shield-halved"></i> No files stored</span>
     `;
     deviceInfo.classList.add("visible");
 }
@@ -217,7 +247,6 @@ initDeviceInfoStream();
 // Custom player event listeners
 playerPlayBtn.addEventListener("click", togglePlayerPlay);
 progressSlider.addEventListener("input", handleSeek);
-volumeBtn.addEventListener("click", toggleMute);
 audio.addEventListener("play", updatePlayButton);
 audio.addEventListener("pause", updatePlayButton);
 audio.addEventListener("timeupdate", updatePlayerProgress);
@@ -440,14 +469,32 @@ function formatTimeRemaining(seconds) {
 }
 
 /**
+ * Get icon class for source type
+ * @param {string} sourceType - The source type ("pdf", "url", "text")
+ * @returns {string} Font Awesome icon class
+ */
+function getSourceIcon(sourceType) {
+    switch (sourceType) {
+        case "pdf":
+            return "fa-file-pdf";
+        case "url":
+            return "fa-link";
+        case "text":
+        default:
+            return "fa-keyboard";
+    }
+}
+
+/**
  * Process SSE stream for progress updates
  * Sets up audio stream once job_id is received
  * @param {Response} response - Fetch response with SSE stream
  * @param {string} docName - Document name for display
+ * @param {string} sourceType - Source type ("pdf", "url", "text")
  * @returns {Promise<void>}
  * @throws {Error} If stream contains an error event or fails
  */
-async function processStream(response, docName) {
+async function processStream(response, docName, sourceType = "text") {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let lastStatus = "";
@@ -511,7 +558,7 @@ async function processStream(response, docName) {
                                 // Use total_time as a rough guide
                                 estimatedDuration = Math.max(estimatedDuration, audio.currentTime + 10);
                             }
-                            filename.textContent = docName;
+                            filename.innerHTML = `<i class="fa-solid ${getSourceIcon(sourceType)}"></i> ${docName}`;
                             currentDocName = docName;
                             player.classList.add("visible");
                             // Set progress to 100%
@@ -583,7 +630,7 @@ async function handleFile(file) {
         }
 
         // Process stream handles both progress SSE and starting audio playback
-        await processStream(response, file.name);
+        await processStream(response, file.name, "pdf");
     } catch (error) {
         if (error.name === "AbortError") {
             // User cancelled - already handled in stopGeneration
@@ -649,7 +696,7 @@ async function handleUrl(url) {
         const docName = urlPath.split("/").pop() || "document";
 
         // Process stream handles both progress SSE and starting audio playback
-        await processStream(response, docName);
+        await processStream(response, docName, "url");
     } catch (error) {
         if (error.name === "AbortError") {
             // User cancelled - already handled in stopGeneration
@@ -709,7 +756,7 @@ async function handleText(text) {
         }
 
         // Process stream handles both progress SSE and starting audio playback
-        await processStream(response, "Pasted Text");
+        await processStream(response, "Pasted Text", "text");
     } catch (error) {
         if (error.name === "AbortError") {
             // User cancelled - already handled in stopGeneration
@@ -755,7 +802,7 @@ dropZone.addEventListener("drop", (e) => {
 
 // Click to select file
 dropZone.addEventListener("click", (e) => {
-    if (e.target !== fileInput && !e.target.classList.contains("file-label")) {
+    if (e.target !== fileInput) {
         fileInput.click();
     }
 });

@@ -140,6 +140,7 @@ class QwenTTSEngine(TTSEngineProtocol):
         self._idle_timeout = idle_timeout
         self._last_activity = time.time()
         self._model_loaded = False
+        self._model_state = "unloaded"  # unloaded, loading, loaded, unloading
         self._lock = threading.Lock()
         self._unload_timer: threading.Timer | None = None
 
@@ -155,6 +156,11 @@ class QwenTTSEngine(TTSEngineProtocol):
         # Load model immediately if no idle timeout (always keep loaded)
         if idle_timeout == 0:
             self._load_model()
+
+    @property
+    def model_state(self) -> str:
+        """Return the current model state: unloaded, loading, loaded, or unloading."""
+        return self._model_state
 
     @property
     def seconds_per_char(self) -> float | None:
@@ -207,6 +213,7 @@ class QwenTTSEngine(TTSEngineProtocol):
         import torch
         from qwen_tts import Qwen3TTSModel
 
+        self._model_state = "loading"
         device_name = "GPU" if self.device == "cuda" else "CPU"
         print(f"🔄 Loading TTS model onto {device_name}...")
         start = time.time()
@@ -235,6 +242,7 @@ class QwenTTSEngine(TTSEngineProtocol):
             )
 
         self._model_loaded = True
+        self._model_state = "loaded"
 
         # Calculate optimal batch size based on available VRAM
         if self.device == "cuda":
@@ -254,6 +262,7 @@ class QwenTTSEngine(TTSEngineProtocol):
 
             import torch
 
+            self._model_state = "unloading"
             print("💤 Unloading TTS model from GPU (idle timeout)...")
 
             # Delete model and clear references
@@ -267,6 +276,7 @@ class QwenTTSEngine(TTSEngineProtocol):
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
 
+            self._model_state = "unloaded"
             print("✅ GPU memory freed")
 
     def _schedule_unload(self) -> None:
