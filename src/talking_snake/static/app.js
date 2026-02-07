@@ -44,6 +44,8 @@ let selectedStyle = "technical";
 let isPaused = false;
 let estimatedDuration = 0; // Estimated total duration from server
 let currentDocName = ""; // Store document name for download filename
+let playbackStartTime = 0; // When playback started (for tracking real elapsed time)
+let playbackElapsed = 0; // Total elapsed playback time
 
 /**
  * Format time in seconds to MM:SS
@@ -124,16 +126,30 @@ function updateDocInfo(data) {
  * Update the custom player progress bar and time display
  */
 function updatePlayerProgress() {
-    const currentTime = audio.currentTime || 0;
-    // Use estimated duration if audio duration is unrealistic (streaming issue)
-    let duration = audio.duration;
-    if (!isFinite(duration) || duration > 36000 || duration <= 0) {
-        duration = estimatedDuration || currentTime + 60; // Fallback
+    // For streaming WAV, browser's duration/currentTime are unreliable
+    // Track real playback time ourselves
+    let currentTime;
+    if (playbackStartTime > 0 && !audio.paused) {
+        currentTime = playbackElapsed + (Date.now() - playbackStartTime) / 1000;
+    } else {
+        currentTime = playbackElapsed;
+    }
+
+    // Use our estimated duration, update it if playback exceeds estimate
+    let duration = estimatedDuration;
+    if (currentTime > duration) {
+        estimatedDuration = currentTime + 10; // Extend estimate
+        duration = estimatedDuration;
+    }
+
+    // Ensure we have reasonable values
+    if (duration <= 0) {
+        duration = 60; // Fallback
     }
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
     progressBar.style.width = `${Math.min(progress, 100)}%`;
-    progressSlider.value = progress;
+    progressSlider.value = Math.min(progress, 100);
     timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
 }
 
@@ -142,11 +158,19 @@ function updatePlayerProgress() {
  */
 function handleSeek(e) {
     const percent = parseFloat(e.target.value);
-    let duration = audio.duration;
-    if (!isFinite(duration) || duration > 36000) {
-        duration = estimatedDuration || 60;
+    const duration = estimatedDuration || 60;
+    const seekTime = (percent / 100) * duration;
+
+    // Set our playback tracker
+    playbackElapsed = seekTime;
+    playbackStartTime = audio.paused ? 0 : Date.now();
+
+    // Try to seek the audio (may not work well with streaming)
+    try {
+        audio.currentTime = seekTime;
+    } catch {
+        // Seeking may fail with streaming audio
     }
-    audio.currentTime = (percent / 100) * duration;
     updatePlayerProgress();
 }
 
@@ -222,10 +246,9 @@ function updateDeviceInfo(info) {
         ? `<span class="device-memory" title="GPU memory used for model and inference"><i class="fa-solid fa-memory"></i> GPU: ${info.memory_used_gb}/${info.memory_total_gb}GB</span>`
         : "";
     const ramInfo = `<span class="device-memory" title="System RAM usage"><i class="fa-solid fa-memory"></i> RAM: ${info.ram_used_gb}/${info.ram_total_gb}GB</span>`;
-    const diskInfo = `<span class="device-memory" title="Available disk space for temporary files"><i class="fa-solid fa-hard-drive"></i> ${info.disk_free_gb}GB free</span>`;
     // Show timing stats if available
     const timingInfo = info.seconds_per_char !== undefined
-        ? `<span class="device-timing" title="Average time to generate audio per character of text${info.total_chars_processed ? `, based on ${info.total_chars_processed.toLocaleString()} characters processed` : ""}"><i class="fa-solid fa-stopwatch"></i> ${info.seconds_per_char.toFixed(4)}s/char${info.total_chars_processed ? ` (${info.total_chars_processed.toLocaleString()} chars)` : ""}</span>`
+        ? `<span class="device-timing" title="Average time to generate audio per character of text"><i class="fa-solid fa-stopwatch"></i> ${info.seconds_per_char.toFixed(4)}s/char</span>`
         : "";
     // Show model state
     const modelStateInfo = getModelStateHtml(info.model_state);
@@ -235,7 +258,6 @@ function updateDeviceInfo(info) {
         ${modelStateInfo}
         ${gpuMemoryInfo}
         ${ramInfo}
-        ${diskInfo}
         ${timingInfo}
         <span class="device-ephemeral" title="Your documents are processed in memory only. Nothing is saved to disk or stored after processing."><i class="fa-solid fa-shield-halved"></i> No files stored</span>
     `;
@@ -270,12 +292,52 @@ initDeviceInfoStream();
 // Custom player event listeners
 playerPlayBtn.addEventListener("click", togglePlayerPlay);
 progressSlider.addEventListener("input", handleSeek);
-audio.addEventListener("play", updatePlayButton);
-audio.addEventListener("pause", updatePlayButton);
+audio.addEventListener("play", () => {
+    // Start tracking real playback time
+    playbackStartTime = Date.now();
+    updatePlayButton();
+});
+audio.addEventListener("pause", () => {
+    // Save elapsed time when pausing
+    if (playbackStartTime > 0) {
+        playbackElapsed += (Date.now() - playbackStartTime) / 1000;
+        playbackStartTime = 0;
+    }
+    updatePlayButton();
+});
 audio.addEventListener("timeupdate", updatePlayerProgress);
 audio.addEventListener("ended", () => {
+    // Update elapsed to match duration on completion
+    if (playbackStartTime > 0) {
+        playbackElapsed += (Date.now() - playbackStartTime) / 1000;
+        playbackStartTime = 0;
+    }
+    // Ensure we show completion
+    if (estimatedDuration > 0 && playbackElapsed < estimatedDuration) {
+        playbackElapsed = estimatedDuration;
+    }
     updatePlayButton();
     progressBar.style.width = "100%";
+    timeDisplay.textContent = `${formatTime(estimatedDuration)} / ${formatTime(estimatedDuration)}`;
+});
+// Update duration when metadata is available
+audio.addEventListener("loadedmetadata", () => {
+    // If browser has a valid duration, use it instead of estimate
+    if (isFinite(audio.duration) && audio.duration > 0 && audio.duration < 36000) {
+        estimatedDuration = audio.duration;
+    }
+    updatePlayerProgress();
+});
+// Also check duration changes (for streaming audio)
+audio.addEventListener("durationchange", () => {
+    if (isFinite(audio.duration) && audio.duration > 0 && audio.duration < 36000) {
+        estimatedDuration = audio.duration;
+    }
+    updatePlayerProgress();
+});
+// Log audio errors for debugging
+audio.addEventListener("error", () => {
+    console.error("Audio error:", audio.error?.message || "Unknown error");
 });
 // Show pause button when audio actually starts playing
 audio.addEventListener("playing", () => {
@@ -298,6 +360,10 @@ audio.addEventListener("canplay", () => {
  */
 async function startAudioStream(jobId) {
     const audioUrl = `/api/audio/${jobId}`;
+
+    // Reset playback tracking for new stream
+    playbackStartTime = 0;
+    playbackElapsed = 0;
 
     // Set up audio source for streaming (user can click play)
     audio.src = audioUrl;
@@ -373,6 +439,104 @@ function deleteAudio() {
  */
 function getSelectedLanguage() {
     return selectedLanguage;
+}
+
+/**
+ * Detect language from text based on character scripts.
+ * @param {string} text - The text to analyze
+ * @returns {string|null} Detected language or null if mostly ASCII/Latin
+ */
+function detectLanguage(text) {
+    if (!text || text.length < 5) {
+        return null;
+    }
+
+    let chinese = 0;
+    let japanese = 0; // Hiragana + Katakana
+    let korean = 0;
+    let latin = 0;
+
+    for (const char of text) {
+        const code = char.charCodeAt(0);
+        // CJK Unified Ideographs (shared by Chinese/Japanese)
+        if (code >= 0x4e00 && code <= 0x9fff) {
+            chinese++;
+        }
+        // Hiragana
+        else if (code >= 0x3040 && code <= 0x309f) {
+            japanese++;
+        }
+        // Katakana
+        else if (code >= 0x30a0 && code <= 0x30ff) {
+            japanese++;
+        }
+        // Hangul Syllables
+        else if (code >= 0xac00 && code <= 0xd7af) {
+            korean++;
+        }
+        // Hangul Jamo
+        else if (code >= 0x1100 && code <= 0x11ff) {
+            korean++;
+        }
+        // Basic Latin letters
+        else if (
+            (code >= 0x41 && code <= 0x5a) ||
+            (code >= 0x61 && code <= 0x7a)
+        ) {
+            latin++;
+        }
+    }
+
+    const total = chinese + japanese + korean + latin;
+    if (total === 0) {
+        return null;
+    }
+
+    // Japanese uses kanji (chinese chars) + kana, so check for kana first
+    if (japanese > 0 && (japanese + chinese) / total > 0.3) {
+        return "japanese";
+    }
+    // Korean
+    if (korean / total > 0.3) {
+        return "korean";
+    }
+    // Chinese (CJK without kana)
+    if (chinese / total > 0.3) {
+        return "chinese";
+    }
+    // Default to English for Latin text
+    if (latin / total > 0.5) {
+        return "english";
+    }
+    return null;
+}
+
+/**
+ * Set the selected language, optionally marking it as auto-detected.
+ * @param {string} lang - Language to select
+ * @param {boolean} isAuto - Whether this was auto-detected
+ */
+function setLanguage(lang, isAuto = false) {
+    const btn = document.querySelector(
+        `#languageButtons .style-btn[data-language="${lang}"]`
+    );
+    if (!btn || selectedLanguage === lang) {
+        return;
+    }
+
+    // Update selection state
+    languageButtons.forEach((b) => {
+        b.classList.remove("active", "auto-detected");
+    });
+    btn.classList.add("active");
+    selectedLanguage = lang;
+
+    // Visual feedback for auto-detection
+    if (isAuto) {
+        btn.classList.add("auto-detected");
+        // Remove animation class after it completes
+        setTimeout(() => btn.classList.remove("auto-detected"), 1500);
+    }
 }
 
 /**
@@ -485,17 +649,7 @@ function updatePauseButton() {
     }
 }
 
-/**
- * Format remaining time for display
- * @param {number} seconds - Remaining time in seconds
- * @returns {string} Formatted time string
- */
-function formatTimeRemaining(seconds) {
-    if (seconds > 60) {
-        return `~${Math.ceil(seconds / 60)} min remaining`;
-    }
-    return `~${Math.ceil(seconds)}s remaining`;
-}
+
 
 /**
  * Get icon class for source type
@@ -552,9 +706,10 @@ async function processStream(response, docName, sourceType = "text") {
                         } else if (data.type === "start" && data.job_id) {
                             // Got job ID - start audio stream immediately
                             const jobId = data.job_id;
-                            // Capture initial duration estimate
-                            if (data.estimated_remaining) {
-                                estimatedDuration = data.estimated_remaining;
+                            // Estimate audio duration from character count
+                            // Typical speech is ~14 chars/sec (150 wpm, 5 chars/word)
+                            if (data.total_chars) {
+                                estimatedDuration = data.total_chars / 14;
                             }
                             // Display document info
                             updateDocInfo(data);
@@ -563,31 +718,48 @@ async function processStream(response, docName, sourceType = "text") {
                                 // Start streaming playback immediately
                                 startAudioStream(jobId);
                             }
-                            const timeStr = formatTimeRemaining(data.estimated_remaining);
+                            // Show generating status
                             showStatus(
-                                `<span class="spinner"></span>ETA ${timeStr}`,
+                                '<span class="spinner"></span> Generating...',
                                 "loading"
                             );
                             // Update progress bar
                             processingProgressBar.style.width = "5%";
                         } else if (data.type === "progress") {
                             lastStatus = data.status;
-                            const timeStr = formatTimeRemaining(data.estimated_remaining);
+                            // Show progress percentage
                             showStatus(
-                                `<span class="spinner"></span>${data.percent}% • ETA ${timeStr}`,
+                                `<span class="spinner"></span> ${data.percent}%`,
                                 "loading"
                             );
                             // Update progress bar
                             processingProgressBar.style.width = `${data.percent}%`;
                         } else if (data.type === "complete") {
                             // Generation complete - show player
-                            // Update estimated duration based on actual processing time
-                            if (data.total_time) {
-                                // Estimate audio duration: ~0.1s per char at normal speech rate
-                                // Use total_time as a rough guide
-                                estimatedDuration = Math.max(estimatedDuration, audio.currentTime + 10);
+                            // Use actual audio duration from server if available
+                            if (data.audio_duration && data.audio_duration > 0) {
+                                estimatedDuration = data.audio_duration;
                             }
-                            filename.innerHTML = `<i class="fa-solid ${getSourceIcon(sourceType)}"></i> ${docName}`;
+                            // Build filename with style and language indicators
+                            const styleIcons = {
+                                technical: "fa-microchip",
+                                conversational: "fa-comments",
+                                storytelling: "fa-book-open",
+                                child_narrative: "fa-child",
+                                news: "fa-newspaper",
+                                academic: "fa-graduation-cap"
+                            };
+                            const langFlags = {
+                                english: "🇬🇧",
+                                chinese: "🇨🇳",
+                                japanese: "🇯🇵",
+                                korean: "🇰🇷"
+                            };
+                            const usedStyle = getSelectedStyle();
+                            const usedLang = getSelectedLanguage();
+                            const styleIcon = styleIcons[usedStyle] || "fa-microchip";
+                            const langFlag = langFlags[usedLang] || "🇬🇧";
+                            filename.innerHTML = `<i class="fa-solid ${getSourceIcon(sourceType)}"></i> ${docName} <span class="filename-meta"><i class="fa-solid ${styleIcon}" title="Style: ${usedStyle}"></i><span title="Language: ${usedLang}">${langFlag}</span></span>`;
                             currentDocName = docName;
                             // Hide stream buttons, show full player with download
                             streamPlayBtn.classList.add("hidden");
@@ -788,8 +960,12 @@ async function handleText(text) {
             throw new Error(error.detail || "Failed to process text");
         }
 
+        // Generate document name from first few words
+        const words = text.trim().split(/\s+/).slice(0, 5).join(" ");
+        const docName = words.length > 30 ? words.slice(0, 30) + "..." : words;
+
         // Process stream handles both progress SSE and starting audio playback
-        await processStream(response, "Pasted Text", "text");
+        await processStream(response, docName, "text");
     } catch (error) {
         if (error.name === "AbortError") {
             // User cancelled - already handled in stopGeneration
@@ -806,6 +982,15 @@ async function handleText(text) {
 // Tab switching
 tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
+        const isAlreadyActive = tab.classList.contains("active");
+        const isUploadTab = tab.dataset.tab === "upload";
+
+        // If clicking on already-active upload tab, open file picker
+        if (isAlreadyActive && isUploadTab) {
+            fileInput.click();
+            return;
+        }
+
         tabs.forEach((t) => t.classList.remove("active"));
         tabContents.forEach((tc) => tc.classList.remove("active"));
         tab.classList.add("active");
@@ -869,6 +1054,14 @@ textInput.addEventListener("keydown", (e) => {
     }
 });
 
+// Auto-detect language from text input
+textInput.addEventListener("input", () => {
+    const detected = detectLanguage(textInput.value);
+    if (detected) {
+        setLanguage(detected, true);
+    }
+});
+
 // Stop button
 stopBtn.addEventListener("click", stopGeneration);
 
@@ -900,9 +1093,7 @@ audio.addEventListener("ended", () => {
 // Language selection
 languageButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-        languageButtons.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        selectedLanguage = btn.dataset.language;
+        setLanguage(btn.dataset.language, false);
     });
 });
 

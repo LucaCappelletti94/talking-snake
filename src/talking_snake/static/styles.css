@@ -45,15 +45,25 @@ body {
 }
 
 h1 {
+    font-family: Fredoka, sans-serif;
     font-size: 1.75rem;
-    margin: 0 0 0.25rem;
+    margin: 0 0 0.5rem;
     color: var(--primary);
+    display: inline;
+    vertical-align: baseline;
 }
 
 .subtitle {
     color: var(--text-muted);
-    margin: 0 0 1rem;
+    margin: 0;
     font-size: 0.9rem;
+    display: inline;
+    vertical-align: baseline;
+}
+
+.header-row {
+    margin-bottom: 0.5rem;
+    text-align: center;
 }
 
 .container {
@@ -65,8 +75,8 @@ h1 {
 .options-row {
     display: flex;
     justify-content: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
     flex-wrap: nowrap;
 }
 
@@ -98,15 +108,23 @@ h1 {
     color: var(--text-muted);
     cursor: pointer;
     font-size: 0.75rem;
+    line-height: 1;
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
+.style-btn i {
+    display: block;
+    line-height: 1;
+}
+
 /* Language buttons use emoji flags */
 .style-btn.lang-btn {
-    font-size: 0.9rem;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0;
 }
 
 .style-btn:hover {
@@ -118,6 +136,29 @@ h1 {
     background: rgb(212, 118, 58, 0.15);
     border-color: var(--primary);
     color: var(--primary);
+}
+
+/* Auto-detected language indicator */
+.style-btn.lang-btn.auto-detected {
+    animation: auto-detect-pulse 0.5s ease-out;
+    box-shadow: 0 0 0 2px var(--primary);
+}
+
+@keyframes auto-detect-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(212, 118, 58, 0.7);
+    }
+
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 4px rgba(212, 118, 58, 0.4);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 2px var(--primary);
+    }
 }
 
 /* Input Section - hidden during processing */
@@ -316,7 +357,7 @@ h1 {
 .drop-zone {
     border: 2px dashed var(--border);
     border-radius: 8px;
-    padding: 1.5rem 1rem;
+    padding: 1rem 0;
     text-align: center;
     transition: all 0.2s ease;
     cursor: pointer;
@@ -332,11 +373,6 @@ h1 {
 .drop-zone p {
     margin: 0 0 0.75rem;
     font-size: 0.95rem;
-}
-
-.drop-zone .hint {
-    color: var(--text-muted);
-    font-size: 0.8rem;
 }
 
 .drop-icon {
@@ -378,28 +414,46 @@ h1 {
 
 .tab-content {
     display: none;
+    opacity: 0;
+    transform: translateY(-8px);
 }
 
 .tab-content.active {
     display: block;
+    opacity: 1;
+    transform: translateY(0);
+    animation: tab-fade-in 0.2s ease-out;
+}
+
+@keyframes tab-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* URL Form */
 .url-form {
     background: var(--surface);
     border-radius: 8px;
-    padding: 1rem;
+    padding: 0.75rem;
 }
 
 .url-input-row {
     display: flex;
     gap: 0.5rem;
-    align-items: stretch;
+    align-items: center;
 }
 
 .url-input-row input[type="url"] {
     flex: 1;
-    padding: 0.6rem 0.75rem;
+    height: 40px;
+    padding: 0 0.75rem;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -414,33 +468,6 @@ h1 {
 }
 
 .url-input-row input[type="url"]::placeholder {
-    color: var(--text-muted);
-}
-
-.url-input-row .submit-btn {
-    padding: 0.6rem 1rem;
-    margin: 0;
-    flex-shrink: 0;
-}
-
-.url-form input[type="url"] {
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-size: 0.9rem;
-    margin-bottom: 0.75rem;
-    transition: border-color 0.15s ease;
-}
-
-.url-form input[type="url"]:focus {
-    outline: none;
-    border-color: var(--primary);
-}
-
-.url-form input[type="url"]::placeholder {
     color: var(--text-muted);
 }
 
@@ -476,13 +503,6 @@ h1 {
     color: var(--text-muted);
 }
 
-.text-form .hint {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    text-align: center;
-    margin: 0;
-}
-
 /* Buttons */
 .submit-btn {
     width: 100%;
@@ -509,11 +529,26 @@ h1 {
     cursor: not-allowed;
 }
 
-.url-form .hint {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    text-align: center;
+/* URL form button override - must come after base .submit-btn */
+.url-input-row .submit-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
     margin: 0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+.url-input-row .submit-btn i {
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+    display: block;
 }
 
 input[type="file"] {
@@ -548,17 +583,19 @@ input[type="file"] {
     display: none;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
+    gap: 0.6rem;
+    padding: 0.4rem 1rem;
     font-size: 0.7rem;
     color: var(--text-muted);
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
     opacity: 0.7;
+    line-height: 1.2;
 }
 
 .device-info.visible {
     display: flex;
     flex-wrap: wrap;
+    row-gap: 0.2rem;
 }
 
 .device-info i {
@@ -671,10 +708,10 @@ input[type="file"] {
 
 /* Audio Player */
 .player {
-    margin-top: 1.5rem;
+    margin-top: 1rem;
     width: 100%;
     display: none;
-    padding: 1.25rem;
+    padding: 0.75rem 1rem;
     background: var(--surface);
     border-radius: 12px;
     border: 1px solid var(--border);
@@ -842,11 +879,24 @@ input[type="file"] {
 }
 
 .filename {
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text);
     word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.filename-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: auto;
 }
 
 /* Spinner Animation */
@@ -859,7 +909,7 @@ input[type="file"] {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-right: 0.4rem;
-    vertical-align: middle;
+    vertical-align: -2px;
 }
 
 @keyframes spin {

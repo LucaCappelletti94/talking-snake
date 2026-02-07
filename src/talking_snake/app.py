@@ -11,7 +11,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 import trafilatura
@@ -60,15 +60,24 @@ class AudioJob:
         self.error: str | None = None
         self.sample_rate = 24000  # Default, will be set by TTS engine
         self.header_sent = False
+        self._total_pcm_bytes = 0  # Track total audio bytes for duration calc
+
+    @property
+    def audio_duration(self) -> float:
+        """Calculate audio duration in seconds from cached PCM data."""
+        # 16-bit mono audio: duration = bytes / (sample_rate * 2)
+        return self._total_pcm_bytes / (self.sample_rate * 2)
 
     def put_audio(self, audio_bytes: bytes) -> None:
         """Add audio data to the queue and cache."""
         self.audio_queue.put(audio_bytes)
         # Cache the PCM data (strip WAV header if present)
         if audio_bytes[:4] == b"RIFF":
-            self.audio_cache.append(audio_bytes[44:])
+            pcm_data = audio_bytes[44:]
         else:
-            self.audio_cache.append(audio_bytes)
+            pcm_data = audio_bytes
+        self.audio_cache.append(pcm_data)
+        self._total_pcm_bytes += len(pcm_data)
 
     def finish(self) -> None:
         """Signal that audio generation is complete."""
@@ -691,13 +700,14 @@ def _generate_audio_to_job(
     # Signal audio generation complete
     job.finish()
 
-    # Send completion event
+    # Send completion event with actual audio duration
     total_time = time.time() - start_time
     complete_data = {
         "type": "complete",
         "total_time": round(total_time, 1),
         "chunks_processed": chunks_processed,
         "batch_size": batch_size,
+        "audio_duration": round(job.audio_duration, 2),
     }
     yield f"event: complete\ndata: {json.dumps(complete_data)}\n\n".encode()
 
@@ -814,11 +824,18 @@ async def download_audio(job_id: str, filename: str = "audio.wav") -> Response:
 
     wav_data = header.getvalue() + audio_data
 
+    # RFC 5987 encoding for non-ASCII filenames
+    # Use ASCII-safe fallback + UTF-8 encoded filename*
+    safe_filename = filename.encode("ascii", "replace").decode("ascii")
+    encoded_filename = quote(filename, safe="")
+
     return Response(
         content=wav_data,
         media_type="audio/wav",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": (
+                f'attachment; filename="{safe_filename}"; ' f"filename*=UTF-8''{encoded_filename}"
+            ),
             "Content-Length": str(len(wav_data)),
         },
     )
@@ -926,6 +943,14 @@ async def read_text_stream(request: TextRequest) -> StreamingResponse:
     if not text.strip():
         raise HTTPException(status_code=400, detail="No readable text provided")
 
+    # Generate doc name from first few words
+    words = text.split()[:5]
+    doc_name = " ".join(words)
+    if len(doc_name) > 30:
+        doc_name = doc_name[:30] + "..."
+    elif len(words) == 5:
+        doc_name = doc_name + "..."
+
     # Create a job for this request
     job = _job_manager.create_job()
 
@@ -936,7 +961,7 @@ async def read_text_stream(request: TextRequest) -> StreamingResponse:
             _tts_engine,
             language,
             style,
-            doc_name="Pasted Text",
+            doc_name=doc_name,
             doc_type="text",
         ),
         media_type="text/event-stream",

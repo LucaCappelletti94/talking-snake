@@ -11,6 +11,7 @@ from talking_snake.app import (
     _create_wav_header,
     _estimate_time,
     _get_device_info,
+    _job_manager,
     create_app,
 )
 from talking_snake.tts import MockTTSEngine
@@ -307,3 +308,103 @@ class TestDeviceInfoEndpoint:
                             break
         except TimeoutError:
             pass  # Expected - we just want to verify the endpoint works
+
+
+class TestDownloadEndpoint:
+    """Tests for the audio download endpoint."""
+
+    async def test_download_nonexistent_job(self, client: AsyncClient) -> None:
+        """Test downloading audio for nonexistent job returns 404."""
+        response = await client.get("/api/download/nonexistent-job-id")
+        assert response.status_code == 404
+
+    async def test_download_job_without_audio(self, client: AsyncClient) -> None:
+        """Test downloading job with no audio data returns 404."""
+        job = _job_manager.create_job()
+        try:
+            response = await client.get(f"/api/download/{job.job_id}")
+            assert response.status_code == 404
+            assert "No audio" in response.json()["detail"]
+        finally:
+            _job_manager.remove_job(job.job_id)
+
+    async def test_download_with_ascii_filename(self, client: AsyncClient) -> None:
+        """Test downloading audio with ASCII filename."""
+        job = _job_manager.create_job()
+        # Add some fake audio data (PCM bytes)
+        job.audio_cache.append(b"\x00\x00" * 1000)
+        job.finish()
+
+        try:
+            response = await client.get(f"/api/download/{job.job_id}?filename=test_audio.wav")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "audio/wav"
+
+            # Check Content-Disposition header
+            cd = response.headers["content-disposition"]
+            assert "attachment" in cd
+            assert "test_audio.wav" in cd
+        finally:
+            _job_manager.remove_job(job.job_id)
+
+    async def test_download_with_chinese_filename(self, client: AsyncClient) -> None:
+        """Test downloading audio with Chinese (non-ASCII) filename."""
+        job = _job_manager.create_job()
+        # Add some fake audio data (PCM bytes)
+        job.audio_cache.append(b"\x00\x00" * 1000)
+        job.finish()
+
+        chinese_filename = "从前有座山.wav"
+
+        try:
+            response = await client.get(f"/api/download/{job.job_id}?filename={chinese_filename}")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "audio/wav"
+
+            # Check Content-Disposition header has RFC 5987 encoding
+            cd = response.headers["content-disposition"]
+            assert "attachment" in cd
+            # Should have ASCII fallback with replacement chars
+            assert 'filename="' in cd
+            # Should have UTF-8 encoded filename*
+            assert "filename*=UTF-8''" in cd
+            # The UTF-8 encoded form should contain percent-encoded Chinese chars
+            assert "%E4%BB%8E%E5%89%8D" in cd  # "从前" encoded
+        finally:
+            _job_manager.remove_job(job.job_id)
+
+    async def test_download_with_japanese_filename(self, client: AsyncClient) -> None:
+        """Test downloading audio with Japanese (non-ASCII) filename."""
+        job = _job_manager.create_job()
+        job.audio_cache.append(b"\x00\x00" * 1000)
+        job.finish()
+
+        japanese_filename = "音声ファイル.wav"
+
+        try:
+            response = await client.get(f"/api/download/{job.job_id}?filename={japanese_filename}")
+            assert response.status_code == 200
+
+            cd = response.headers["content-disposition"]
+            assert "filename*=UTF-8''" in cd
+        finally:
+            _job_manager.remove_job(job.job_id)
+
+    async def test_download_returns_valid_wav(self, client: AsyncClient) -> None:
+        """Test that downloaded file is a valid WAV with correct header."""
+        job = _job_manager.create_job()
+        # Add some fake audio data
+        job.audio_cache.append(b"\x00\x00" * 1000)
+        job.finish()
+
+        try:
+            response = await client.get(f"/api/download/{job.job_id}")
+            assert response.status_code == 200
+
+            content = response.content
+            # Check WAV header magic bytes
+            assert content[:4] == b"RIFF"
+            assert content[8:12] == b"WAVE"
+            assert content[12:16] == b"fmt "
+        finally:
+            _job_manager.remove_job(job.job_id)
