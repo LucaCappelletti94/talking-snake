@@ -12,18 +12,18 @@ on:
         type: choice
         options:
           - huggingface
-          - testpypi
           - pypi
 
 jobs:
   # Run CI checks first (skip for HF-only deploys for speed)
   ci:
-    if: github.event_name == 'release' || github.event.inputs.publish_target != 'huggingface'
+    if: github.event_name == 'release' || github.event.inputs.publish_target == 'pypi'
     uses: ./.github/workflows/ci.yml
 
   # Deploy to Hugging Face Spaces
   deploy-huggingface:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_target == 'huggingface'
+    needs: ci
+    if: always() && (github.event_name == 'release' || github.event.inputs.publish_target == 'huggingface')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
 
   build:
     needs: ci
-    if: github.event_name == 'release' || github.event.inputs.publish_target != 'huggingface'
+    if: github.event_name == 'release' || github.event.inputs.publish_target == 'pypi'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,25 +74,6 @@ jobs:
         with:
           name: dist
           path: dist/
-
-  publish-testpypi:
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_target == 'testpypi'
-    runs-on: ubuntu-latest
-    environment: testpypi
-    permissions:
-      id-token: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
     needs: build

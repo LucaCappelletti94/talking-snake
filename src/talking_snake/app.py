@@ -834,7 +834,7 @@ async def download_audio(job_id: str, filename: str = "audio.wav") -> Response:
         media_type="audio/wav",
         headers={
             "Content-Disposition": (
-                f'attachment; filename="{safe_filename}"; ' f"filename*=UTF-8''{encoded_filename}"
+                f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{encoded_filename}"
             ),
             "Content-Length": str(len(wav_data)),
         },
