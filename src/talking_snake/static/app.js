@@ -168,14 +168,18 @@ function toggleMute() {
  */
 function updateDeviceInfo(info) {
     const icon = info.device === "cuda" ? "fa-microchip" : "fa-server";
-    const memoryInfo = info.device === "cuda"
-        ? `${info.memory_used_gb}GB / ${info.memory_total_gb}GB (${info.memory_percent}%)`
-        : "CPU mode";
+    const gpuMemoryInfo = info.device === "cuda"
+        ? `<span class="device-memory"><i class="fa-solid fa-memory"></i> GPU: ${info.memory_used_gb}/${info.memory_total_gb}GB</span>`
+        : "";
+    const ramInfo = `<span class="device-memory"><i class="fa-solid fa-memory"></i> RAM: ${info.ram_used_gb}/${info.ram_total_gb}GB</span>`;
+    const diskInfo = `<span class="device-memory"><i class="fa-solid fa-hard-drive"></i> ${info.disk_free_gb}GB free</span>`;
     deviceInfo.innerHTML = `
         <i class="fa-solid ${icon}"></i>
         <span>${info.device_name}</span>
-        <span class="device-memory">${memoryInfo}</span>
-        <span class="device-batch">Batch: ${info.batch_size}</span>
+        ${gpuMemoryInfo}
+        ${ramInfo}
+        ${diskInfo}
+        <span class="device-ephemeral"><i class="fa-solid fa-shield-halved"></i> No files stored</span>
     `;
     deviceInfo.classList.add("visible");
 }

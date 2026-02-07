@@ -507,7 +507,25 @@ input[type="file"] {
 }
 
 .device-memory {
-    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.device-memory i {
+    font-size: 0.6rem;
+}
+
+.device-ephemeral {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--success);
+}
+
+.device-ephemeral i {
+    color: var(--success);
+    font-size: 0.6rem;
 }
 
 .device-batch {

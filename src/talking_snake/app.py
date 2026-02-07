@@ -389,6 +389,9 @@ def _get_device_info() -> dict:
     Returns:
         Device type, memory usage, and model info.
     """
+    import shutil
+
+    import psutil
     import torch
 
     info = {
@@ -398,7 +401,19 @@ def _get_device_info() -> dict:
         "memory_total_gb": 0,
         "memory_percent": 0,
         "batch_size": 1,
+        "ram_used_gb": 0,
+        "ram_total_gb": 0,
+        "disk_free_gb": 0,
     }
+
+    # Get RAM info
+    ram = psutil.virtual_memory()
+    info["ram_used_gb"] = round(ram.used / 1024**3, 1)
+    info["ram_total_gb"] = round(ram.total / 1024**3, 1)
+
+    # Get disk free space
+    disk = shutil.disk_usage("/")
+    info["disk_free_gb"] = round(disk.free / 1024**3, 1)
 
     if torch.cuda.is_available():
         props = torch.cuda.get_device_properties(0)
