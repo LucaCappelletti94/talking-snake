@@ -90,7 +90,7 @@ function updateDocInfo(data) {
     const docName = data.doc_name || "Document";
     const pageInfo = data.page_count ? `<span class="doc-pages"><i class="fa-solid fa-file"></i> ${data.page_count}p</span>` : "";
     const charInfo = data.total_chars ? `<span class="doc-chars"><i class="fa-solid fa-font"></i> ${formatNumber(data.total_chars)}</span>` : "";
-    
+
     docInfo.innerHTML = `
         <span class="doc-name" title="${docName}"><i class="fa-solid ${icon}"></i><span class="doc-name-text">${docName}</span></span>
         ${pageInfo}
@@ -108,7 +108,7 @@ function updatePlayerProgress() {
     if (!isFinite(duration) || duration > 36000 || duration <= 0) {
         duration = estimatedDuration || currentTime + 60; // Fallback
     }
-    
+
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
     progressBar.style.width = `${Math.min(progress, 100)}%`;
     progressSlider.value = progress;
@@ -167,7 +167,7 @@ function toggleMute() {
  */
 function updateDeviceInfo(info) {
     const icon = info.device === "cuda" ? "fa-microchip" : "fa-server";
-    const memoryInfo = info.device === "cuda" 
+    const memoryInfo = info.device === "cuda"
         ? `${info.memory_used_gb}GB / ${info.memory_total_gb}GB (${info.memory_percent}%)`
         : "CPU mode";
     deviceInfo.innerHTML = `
@@ -184,7 +184,7 @@ function updateDeviceInfo(info) {
  */
 function initDeviceInfoStream() {
     const eventSource = new EventSource("/api/device-info-stream");
-    
+
     eventSource.onmessage = (event) => {
         try {
             const info = JSON.parse(event.data);
@@ -193,7 +193,7 @@ function initDeviceInfoStream() {
             // Silently fail - device info is optional
         }
     };
-    
+
     eventSource.onerror = () => {
         // On error, close and try to reconnect after a delay
         eventSource.close();
@@ -244,17 +244,17 @@ function downloadAudio() {
     if (!currentAudioBlob) {
         return;
     }
-    
+
     const url = URL.createObjectURL(currentAudioBlob);
     const a = document.createElement("a");
     a.href = url;
-    
+
     // Create filename from document name
     let filename = currentDocName || "audio";
     // Remove file extension if present and add .wav
     filename = filename.replace(/\.[^.]+$/, "") + ".wav";
     a.download = filename;
-    
+
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -307,25 +307,25 @@ function stopGeneration() {
         currentAbortController.abort();
         currentAbortController = null;
     }
-    
+
     // Stop audio playback and clear source
     audio.pause();
     audio.currentTime = 0;
     audio.src = "";
     audio.load(); // Force release of audio resources
-    
+
     // Reset pause state
     isPaused = false;
     updatePauseButton();
-    
+
     // Hide download button and pause button
     downloadBtn.classList.add("hidden");
     pauseBtn.classList.add("hidden");
     currentAudioBlob = null;
-    
+
     // Reset progress bar
     processingProgressBar.style.width = "0%";
-    
+
     showStatus('<i class="fa-solid fa-ban"></i> Generation stopped', "error");
     showInputSection();
 }
@@ -474,7 +474,7 @@ async function processStream(response, docName) {
                                 "success"
                             );
                             updatePlayerProgress();
-                            
+
                             // Fetch audio blob for download capability
                             if (jobId) {
                                 fetchAudioBlob(jobId);

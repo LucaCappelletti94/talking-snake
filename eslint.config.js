@@ -3,6 +3,8 @@ import js from "@eslint/js";
 export default [
     js.configs.recommended,
     {
+        files: ["**/*.js"],
+        ignores: ["eslint.config.js"],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: "script",

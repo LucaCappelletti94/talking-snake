@@ -3,8 +3,9 @@
 
 from pathlib import Path
 
-
-SAMPLE_TEXT = """Welcome to Talking Snake! This tool transforms PDF documents and web pages into natural-sounding speech. Simply upload a PDF or paste a URL, and I'll read the content aloud for you. Whether you're multitasking, learning on the go, or simply prefer listening over reading, Talking Snake makes written content effortlessly accessible."""
+SAMPLE_TEXT = (
+    "Welcome to Talking Snake! Upload any PDF or paste a URL, " "and I will read it aloud for you."
+)
 
 
 def main() -> None:

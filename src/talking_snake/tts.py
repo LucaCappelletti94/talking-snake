@@ -327,10 +327,12 @@ class QwenTTSEngine(TTSEngineProtocol):
                 wav_file.setsampwidth(2)  # 16-bit
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_int16.tobytes())
-            return buffer.getvalue()
+            result: bytes = buffer.getvalue()
+            return result
         else:
             # Return raw PCM data
-            return audio_int16.tobytes()
+            pcm_data: bytes = audio_int16.tobytes()
+            return pcm_data
 
 
 class MockTTSEngine(TTSEngineProtocol):
