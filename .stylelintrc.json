@@ -5,6 +5,7 @@
         "custom-property-pattern": null,
         "no-descending-specificity": null,
         "color-function-notation": "legacy",
+        "color-function-alias-notation": null,
         "alpha-value-notation": "number"
     }
 }

@@ -24,6 +24,7 @@ const deviceInfo = document.getElementById("deviceInfo");
 const docInfo = document.getElementById("docInfo");
 const languageButtons = document.querySelectorAll("#languageButtons .style-btn");
 const processingProgressBar = document.getElementById("processingProgressBar");
+const streamPlayBtn = document.getElementById("streamPlayBtn");
 
 // Custom player elements
 const playerPlayBtn = document.getElementById("playerPlayBtn");
@@ -39,9 +40,9 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 // State
 let currentAbortController = null;
 let selectedLanguage = "english";
+let selectedStyle = "technical";
 let isPaused = false;
 let estimatedDuration = 0; // Estimated total duration from server
-let currentAudioBlob = null; // Store audio blob for download
 let currentDocName = ""; // Store document name for download filename
 
 /**
@@ -90,10 +91,32 @@ function updateDocInfo(data) {
     const pageInfo = data.page_count ? `<span class="doc-pages"><i class="fa-solid fa-file"></i> ${data.page_count}p</span>` : "";
     const charInfo = data.total_chars ? `<span class="doc-chars"><i class="fa-solid fa-font"></i> ${formatNumber(data.total_chars)}</span>` : "";
 
+    // Style icons mapping
+    const styleIcons = {
+        technical: "fa-microchip",
+        narrative: "fa-book-open",
+        child_narrative: "fa-child",
+        news: "fa-newspaper",
+        academic: "fa-graduation-cap"
+    };
+
+    // Language flags mapping
+    const langFlags = {
+        english: "🇬🇧",
+        chinese: "🇨🇳",
+        japanese: "🇯🇵",
+        korean: "🇰🇷"
+    };
+
+    const styleIcon = styleIcons[selectedStyle] || "fa-microchip";
+    const langFlag = langFlags[selectedLanguage] || "🇬🇧";
+
     docInfo.innerHTML = `
         <span class="doc-name" title="${docName}"><i class="fa-solid ${icon}"></i><span class="doc-name-text">${docName}</span></span>
         ${pageInfo}
         ${charInfo}
+        <span class="doc-style" title="Style: ${selectedStyle}"><i class="fa-solid ${styleIcon}"></i></span>
+        <span class="doc-lang" title="Language: ${selectedLanguage}">${langFlag}</span>
     `;
 }
 
@@ -256,58 +279,56 @@ audio.addEventListener("ended", () => {
 });
 // Show pause button when audio actually starts playing
 audio.addEventListener("playing", () => {
+    streamPlayBtn.classList.add("hidden");
     pauseBtn.classList.remove("hidden");
 });
 
+// Show stream play button when audio has enough data to start playing
+audio.addEventListener("canplay", () => {
+    // Only show if processing is still in progress (player not visible yet)
+    // and audio is paused (not already playing) and pause button isn't showing
+    if (!player.classList.contains("visible") && audio.paused && pauseBtn.classList.contains("hidden")) {
+        streamPlayBtn.classList.remove("hidden");
+    }
+});
+
 /**
- * Fetch audio blob from the server, store for download, and start playback
+ * Start streaming audio playback and enable download from cache
  * @param {string} jobId - The job ID for the audio
  */
-async function fetchAndPlayAudio(jobId) {
-    try {
-        const response = await fetch(`/api/audio/${jobId}`);
-        if (response.ok) {
-            currentAudioBlob = await response.blob();
-            // Create blob URL for playback
-            const blobUrl = URL.createObjectURL(currentAudioBlob);
-            audio.src = blobUrl;
-            audio.load();
-            // Try to play (may need user interaction first time)
-            audio.play().catch(() => {
-                // Autoplay blocked - will play when user clicks
-            });
-            updatePlayButton();
-            // Show download and delete buttons
-            downloadBtn.classList.remove("hidden");
-            deleteBtn.classList.remove("hidden");
-        }
-    } catch (error) {
-        console.error("Failed to fetch audio:", error);
-    }
+async function startAudioStream(jobId) {
+    const audioUrl = `/api/audio/${jobId}`;
+
+    // Set up audio source for streaming (user can click play)
+    audio.src = audioUrl;
+    audio.load();
+
+    // Store job ID for download - will fetch from cache
+    audio.dataset.jobId = jobId;
+
+    // Play button will be shown by the canplay event handler
 }
 
 /**
  * Download the current audio as a WAV file
  */
 function downloadAudio() {
-    if (!currentAudioBlob) {
+    const jobId = audio.dataset.jobId;
+    if (!jobId) {
         return;
     }
 
-    const url = URL.createObjectURL(currentAudioBlob);
-    const a = document.createElement("a");
-    a.href = url;
-
     // Create filename from document name
     let filename = currentDocName || "audio";
-    // Remove file extension if present and add .wav
     filename = filename.replace(/\.[^.]+$/, "") + ".wav";
-    a.download = filename;
 
+    // Use download endpoint which returns proper WAV file
+    const a = document.createElement("a");
+    a.href = `/api/download/${jobId}?filename=${encodeURIComponent(filename)}`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 /**
@@ -327,7 +348,6 @@ function deleteAudio() {
         audio.currentTime = 0;
 
         // Clear state
-        currentAudioBlob = null;
         currentDocName = "";
         estimatedDuration = 0;
 
@@ -356,6 +376,14 @@ function getSelectedLanguage() {
 }
 
 /**
+ * Get the currently selected style
+ * @returns {string} The selected style ID
+ */
+function getSelectedStyle() {
+    return selectedStyle;
+}
+
+/**
  * Show the input section and hide processing section
  */
 function showInputSection() {
@@ -369,9 +397,10 @@ function showInputSection() {
 function showProcessingSection() {
     inputSection.classList.add("hidden");
     processingSection.classList.add("visible");
-    // Reset progress bar and hide pause button
+    // Reset progress bar and hide buttons
     processingProgressBar.style.width = "0%";
     pauseBtn.classList.add("hidden");
+    streamPlayBtn.classList.add("hidden");
 }
 
 /**
@@ -404,10 +433,10 @@ function stopGeneration() {
     isPaused = false;
     updatePauseButton();
 
-    // Hide download button and pause button
+    // Hide download button, pause button, and stream play button
     downloadBtn.classList.add("hidden");
     pauseBtn.classList.add("hidden");
-    currentAudioBlob = null;
+    streamPlayBtn.classList.add("hidden");
 
     // Reset progress bar
     processingProgressBar.style.width = "0%";
@@ -531,8 +560,8 @@ async function processStream(response, docName, sourceType = "text") {
                             updateDocInfo(data);
                             if (!audioJobId) {
                                 audioJobId = jobId;
-                                // Fetch audio as blob so we can both play and download
-                                fetchAndPlayAudio(jobId);
+                                // Start streaming playback immediately
+                                startAudioStream(jobId);
                             }
                             const timeStr = formatTimeRemaining(data.estimated_remaining);
                             showStatus(
@@ -560,6 +589,10 @@ async function processStream(response, docName, sourceType = "text") {
                             }
                             filename.innerHTML = `<i class="fa-solid ${getSourceIcon(sourceType)}"></i> ${docName}`;
                             currentDocName = docName;
+                            // Hide stream buttons, show full player with download
+                            streamPlayBtn.classList.add("hidden");
+                            downloadBtn.classList.remove("hidden");
+                            deleteBtn.classList.remove("hidden");
                             player.classList.add("visible");
                             // Set progress to 100%
                             processingProgressBar.style.width = "100%";
@@ -608,11 +641,11 @@ async function handleFile(file) {
     showStatus('<span class="spinner"></span> Extracting text...', "loading");
     player.classList.remove("visible");
     downloadBtn.classList.add("hidden");
-    currentAudioBlob = null;
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("language", getSelectedLanguage());
+    formData.append("style", getSelectedStyle());
 
     // Create abort controller for this request
     currentAbortController = new AbortController();
@@ -667,7 +700,6 @@ async function handleUrl(url) {
     showStatus('<span class="spinner"></span> Fetching content...', "loading");
     player.classList.remove("visible");
     downloadBtn.classList.add("hidden");
-    currentAudioBlob = null;
     urlSubmit.disabled = true;
 
     // Create abort controller for this request
@@ -681,7 +713,8 @@ async function handleUrl(url) {
             },
             body: JSON.stringify({
                 url,
-                language: getSelectedLanguage()
+                language: getSelectedLanguage(),
+                style: getSelectedStyle()
             }),
             signal: currentAbortController.signal,
         });
@@ -731,7 +764,6 @@ async function handleText(text) {
     showStatus('<span class="spinner"></span> Processing text...', "loading");
     player.classList.remove("visible");
     downloadBtn.classList.add("hidden");
-    currentAudioBlob = null;
     textSubmit.disabled = true;
 
     // Create abort controller for this request
@@ -745,7 +777,8 @@ async function handleText(text) {
             },
             body: JSON.stringify({
                 text,
-                language: getSelectedLanguage()
+                language: getSelectedLanguage(),
+                style: getSelectedStyle()
             }),
             signal: currentAbortController.signal,
         });
@@ -839,6 +872,14 @@ textInput.addEventListener("keydown", (e) => {
 // Stop button
 stopBtn.addEventListener("click", stopGeneration);
 
+// Stream play button (during processing)
+streamPlayBtn.addEventListener("click", () => {
+    audio.play().catch(() => {});
+    // Hide stream play button and show pause button
+    streamPlayBtn.classList.add("hidden");
+    pauseBtn.classList.remove("hidden");
+});
+
 // Pause button
 pauseBtn.addEventListener("click", togglePause);
 
@@ -862,5 +903,15 @@ languageButtons.forEach((btn) => {
         languageButtons.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         selectedLanguage = btn.dataset.language;
+    });
+});
+
+// Style selection
+const styleButtons = document.querySelectorAll("#styleButtons .style-btn");
+styleButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+        styleButtons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedStyle = btn.dataset.style;
     });
 });

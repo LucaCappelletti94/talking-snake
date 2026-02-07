@@ -8,6 +8,7 @@ import time
 import wave
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -42,17 +43,145 @@ class TTSEngineProtocol(ABC):
         return 1
 
 
-# Professional narration style prompt
-# This instructs the model to read with clear, authoritative delivery
-PROFESSIONAL_STYLE = (
-    "Read this as a professional narrator with clear enunciation, "
-    "measured pacing, and an authoritative yet warm tone. "
-    "Speak naturally as if presenting an audiobook or documentary. "
-    "Avoid sounding robotic or monotone. Emphasize key points and maintain a steady rhythm. "
-    "Use appropriate intonation to convey meaning and keep the listener engaged. "
-    "This is not casual conversation, but a polished narration style. "
-    "Use proper diction, read correctly acronyms, and pronounce all words clearly."
+@dataclass
+class TTSStyle:
+    """Defines a TTS speaking style with its configuration."""
+
+    id: str  # Unique identifier (e.g., "technical", "narrative")
+    name: str  # Display name (e.g., "Technical Documentation")
+    icon: str  # Font Awesome icon class (e.g., "fa-gear")
+    description: str  # Short description for tooltips
+    prompt: str  # The instruct prompt for the TTS model
+
+
+# === TTS STYLES ===
+# Each style provides a different speaking approach optimized for specific content types
+
+STYLE_TECHNICAL = TTSStyle(
+    id="technical",
+    name="Technical",
+    icon="fa-microchip",
+    description="Clear, precise reading for code and technical documentation",
+    prompt=(
+        "You are a technical speech engine reading engineering documents. "
+        "Your task is to convert text into clear, accurate spoken output. "
+        "Read in a neutral, controlled, professional voice. "
+        "Do not sound expressive, emotional, or conversational. "
+        "Do not use audiobook, storytelling, or presenter intonation. "
+        "Prioritize intelligibility and correctness over naturalness. "
+        "Maintain steady pacing and flat prosody appropriate for scientific material. "
+        "Pronounce all acronyms as individual letters unless they are standard spoken words. "
+        "Pronounce symbols, operators, and punctuation when they affect meaning. "
+        "Preserve capitalization, parentheses, and formatting as part of the spoken output. "
+        "When reading code, equations, or identifiers, slow down and speak every token clearly. "
+        "Insert short pauses at commas and longer pauses at periods and line breaks. "
+        "Do not summarize, interpret, or rephrase. "
+        "Read exactly what is written."
+    ),
 )
+
+STYLE_NARRATIVE = TTSStyle(
+    id="narrative",
+    name="Narrative",
+    icon="fa-book-open",
+    description="Natural, engaging reading for articles and stories",
+    prompt=(
+        "You are a professional narrative voice reading long-form text. "
+        "Your task is to tell a story in a clear, engaging, and natural way. "
+        "Use a warm, expressive, and fluid voice. "
+        "Vary intonation and rhythm to reflect meaning, emotion, and emphasis. "
+        "Sound human and immersive, not robotic or monotone. "
+        "Maintain smooth pacing, slowing for important moments, speeding up for transitions. "
+        "Use natural pauses at punctuation and paragraph breaks. "
+        "Pronounce all words clearly, but do not over-articulate symbols or formatting. "
+        "Read acronyms as spoken words when they are commonly pronounced that way. "
+        "Preserve the narrative flow and emotional tone of the text. "
+        "Do not flatten or neutralize the delivery."
+    ),
+)
+
+STYLE_CHILD_NARRATIVE = TTSStyle(
+    id="child_narrative",
+    name="Child Narrative",
+    icon="fa-child",
+    description="Playful, expressive reading for children's stories",
+    prompt=(
+        "You are a storyteller reading aloud to young children. "
+        "Your task is to tell a story in a friendly, gentle, and engaging way. "
+        "Use a warm, soft, and expressive voice. "
+        "Sound kind, calm, and reassuring. "
+        "Vary intonation to match emotions and actions in the story. "
+        "Maintain a slow to moderate pace with clear articulation. "
+        "Insert natural pauses so children can follow along. "
+        "Pronounce words simply and clearly. "
+        "Read acronyms and difficult words in their most familiar spoken form. "
+        "Keep the tone playful but soothing. "
+        "Do not sound technical, formal, or adult-oriented."
+    ),
+)
+
+STYLE_NEWS = TTSStyle(
+    id="news",
+    name="News",
+    icon="fa-newspaper",
+    description="Authoritative, clear delivery for news and reports",
+    prompt=(
+        "You are a professional news anchor delivering broadcast news. "
+        "Your task is to read information clearly, confidently, and with authority. "
+        "Use a neutral, composed, and trustworthy voice. "
+        "Avoid emotional or dramatic delivery. "
+        "Do not sound conversational or casual. "
+        "Maintain a steady, moderate pace with crisp articulation. "
+        "Use controlled intonation to mark headlines, key facts, and transitions. "
+        "Pronounce names, numbers, acronyms, and places carefully and accurately. "
+        "Pause briefly at commas and longer at periods and topic changes. "
+        "Sound factual, objective, and broadcast-ready at all times."
+    ),
+)
+
+STYLE_ACADEMIC = TTSStyle(
+    id="academic",
+    name="Academic",
+    icon="fa-graduation-cap",
+    description="Measured, scholarly reading for papers and research",
+    prompt=(
+        "You are an academic speech engine reading peer-reviewed scientific papers. "
+        "Your task is to render complex scholarly text into clear, precise spoken language. "
+        "Use a neutral, formal, and controlled voice. "
+        "Do not sound expressive, emotional, or conversational. "
+        "Do not use audiobook or presenter intonation. "
+        "Maintain steady pacing suitable for dense technical material. "
+        "Favor clarity and accuracy over naturalness. "
+        "Pronounce technical terminology, Greek letters, acronyms, and units correctly. "
+        "Read acronyms as individual letters unless they are standard spoken words. "
+        "Preserve capitalization, punctuation, and structure when they affect meaning. "
+        "Insert short pauses at commas and longer pauses at periods and section breaks. "
+        "Slow down slightly for equations, symbols, gene names, and references. "
+        "Do not summarize, interpret, or simplify the text. "
+        "Read exactly what is written."
+    ),
+)
+
+# Registry of all available styles
+TTS_STYLES: dict[str, TTSStyle] = {
+    style.id: style
+    for style in [
+        STYLE_TECHNICAL,
+        STYLE_NARRATIVE,
+        STYLE_CHILD_NARRATIVE,
+        STYLE_NEWS,
+        STYLE_ACADEMIC,
+    ]
+}
+
+# Default style
+DEFAULT_STYLE = STYLE_TECHNICAL
+
+
+def get_style(style_id: str) -> TTSStyle:
+    """Get a TTS style by ID, falling back to default if not found."""
+    return TTS_STYLES.get(style_id, DEFAULT_STYLE)
+
 
 # Language to default voice mapping
 LANGUAGE_VOICES: dict[str, str] = {
@@ -65,8 +194,8 @@ LANGUAGE_VOICES: dict[str, str] = {
 # Default chunk size for streaming
 # Larger chunks = more stable voice, fewer artifacts at boundaries
 # Smaller chunks = faster first audio but potential voice instability
-# 1200 chars provides good balance for natural speech flow
-DEFAULT_CHUNK_SIZE = 1200
+# 1800 chars provides good balance for natural speech flow
+DEFAULT_CHUNK_SIZE = 1800
 
 # Idle timeout before unloading model from GPU (seconds)
 # Set to 0 to disable auto-unloading
@@ -150,12 +279,28 @@ class QwenTTSEngine(TTSEngineProtocol):
         self._total_chars_processed: int = 0
         self._total_time_spent: float = 0.0
 
+        # Current style for TTS
+        self._style: TTSStyle = DEFAULT_STYLE
+
         # Model will be loaded on first request (lazy loading)
         self.model = None
 
         # Load model immediately if no idle timeout (always keep loaded)
         if idle_timeout == 0:
             self._load_model()
+
+    @property
+    def style(self) -> TTSStyle:
+        """Return the current TTS style."""
+        return self._style
+
+    def set_style(self, style_id: str) -> None:
+        """Set the TTS style by ID.
+
+        Args:
+            style_id: Style identifier (technical, narrative, news, casual, academic).
+        """
+        self._style = get_style(style_id)
 
     @property
     def model_state(self) -> str:
@@ -389,10 +534,9 @@ class QwenTTSEngine(TTSEngineProtocol):
                     continue
 
                 # Always use batched call for consistent GPU memory allocation
-                # Use professional narration style for clear, authoritative delivery
-                batch_instruct = (
-                    [PROFESSIONAL_STYLE] * len(batch) if len(batch) > 1 else PROFESSIONAL_STYLE
-                )
+                # Use the current style's prompt for delivery
+                style_prompt = self._style.prompt
+                batch_instruct = [style_prompt] * len(batch) if len(batch) > 1 else style_prompt
                 audios, sr = self.model.generate_custom_voice(
                     text=batch if len(batch) > 1 else batch[0],
                     speaker=[self.voice] * len(batch) if len(batch) > 1 else self.voice,

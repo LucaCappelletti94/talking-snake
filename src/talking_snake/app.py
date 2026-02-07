@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import httpx
 import trafilatura
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -24,6 +24,7 @@ from talking_snake.extract import clean_text, extract_text, get_page_count
 from talking_snake.tts import (
     DEFAULT_CHUNK_SIZE,
     LANGUAGE_VOICES,
+    TTS_STYLES,
     MockTTSEngine,
     TTSEngineProtocol,
 )
@@ -52,15 +53,22 @@ class AudioJob:
     def __init__(self, job_id: str):
         self.job_id = job_id
         self.audio_queue: queue.Queue[bytes | None] = queue.Queue()
+        self.audio_cache: list[bytes] = []  # Cache PCM chunks for replay/download
         self.started = time.time()
         self.completed = False
+        self.stream_started = False  # Track if live stream has started
         self.error: str | None = None
         self.sample_rate = 24000  # Default, will be set by TTS engine
         self.header_sent = False
 
     def put_audio(self, audio_bytes: bytes) -> None:
-        """Add audio data to the queue."""
+        """Add audio data to the queue and cache."""
         self.audio_queue.put(audio_bytes)
+        # Cache the PCM data (strip WAV header if present)
+        if audio_bytes[:4] == b"RIFF":
+            self.audio_cache.append(audio_bytes[44:])
+        else:
+            self.audio_cache.append(audio_bytes)
 
     def finish(self) -> None:
         """Signal that audio generation is complete."""
@@ -117,6 +125,7 @@ class UrlRequest(BaseModel):
 
     url: str
     language: str = "english"
+    style: str = "technical"
 
 
 class TextRequest(BaseModel):
@@ -124,6 +133,7 @@ class TextRequest(BaseModel):
 
     text: str
     language: str = "english"
+    style: str = "technical"
 
 
 class EstimateResponse(BaseModel):
@@ -170,6 +180,7 @@ def create_app(tts_engine: TTSEngineProtocol | None = None) -> FastAPI:
     app.add_api_route("/api/read-url-stream", read_url_stream, methods=["POST"])
     app.add_api_route("/api/read-text-stream", read_text_stream, methods=["POST"])
     app.add_api_route("/api/audio/{job_id}", stream_audio, methods=["GET"])
+    app.add_api_route("/api/download/{job_id}", download_audio, methods=["GET"])
     app.add_api_route("/api/languages", get_languages, methods=["GET"])
     app.add_api_route("/api/device-info-stream", stream_device_info, methods=["GET"])
     app.add_api_route("/api/health", health_check, methods=["GET"])
@@ -545,6 +556,7 @@ def _generate_audio_to_job(
     text: str,
     tts_engine: TTSEngineProtocol,
     language: str = "english",
+    style: str = "technical",
     doc_name: str = "document",
     doc_type: str = "text",
     page_count: int | None = None,
@@ -560,11 +572,10 @@ def _generate_audio_to_job(
         text: Text to synthesize.
         tts_engine: TTS engine to use.
         language: Language for TTS (english, chinese, japanese, korean).
+        style: TTS style (technical, narrative, news, casual, academic).
         doc_name: Name of the document being processed.
         doc_type: Type of document (pdf, url, text).
         page_count: Number of pages (for PDFs).
-        tts_engine: TTS engine to use.
-        language: Language for TTS (english, chinese, japanese, korean).
 
     Yields:
         SSE events for progress.
@@ -574,6 +585,10 @@ def _generate_audio_to_job(
     # Apply language if the engine supports it
     if hasattr(tts_engine, "set_language"):
         tts_engine.set_language(language)
+
+    # Apply style if the engine supports it
+    if hasattr(tts_engine, "set_style"):
+        tts_engine.set_style(style)
 
     # Get chunk size and batch size from engine
     chunk_size = getattr(tts_engine, "chunk_size", DEFAULT_CHUNK_SIZE)
@@ -604,7 +619,11 @@ def _generate_audio_to_job(
 
     # Use calibrated estimate if available, otherwise initial estimate
     seconds_per_char = getattr(tts_engine, "seconds_per_char", None) or INITIAL_SECONDS_PER_CHAR
-    estimated_total = total_chars * seconds_per_char
+
+    # Account for batch efficiency: processing N chunks in parallel is ~N times faster
+    # The efficiency isn't perfectly linear, so use a conservative factor of sqrt(batch_size)
+    batch_efficiency = batch_size**0.5 if batch_size > 1 else 1.0
+    estimated_total = (total_chars * seconds_per_char) / batch_efficiency
 
     # Send initial progress event with job_id and batch info
     progress_data = {
@@ -688,6 +707,7 @@ async def stream_audio(job_id: str) -> StreamingResponse:
 
     This endpoint streams the raw WAV audio as it's being generated.
     The browser can start playing as soon as data arrives.
+    First request streams live; subsequent requests return cached audio.
 
     Args:
         job_id: The job ID to stream audio for.
@@ -699,7 +719,9 @@ async def stream_audio(job_id: str) -> StreamingResponse:
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    def generate_audio() -> Iterator[bytes]:
+    def generate_audio_live() -> Iterator[bytes]:
+        """Stream audio live from queue (first request)."""
+        job.stream_started = True
         # Send WAV header first
         yield _create_wav_header(sample_rate=24000)
 
@@ -713,8 +735,6 @@ async def stream_audio(job_id: str) -> StreamingResponse:
                     break
                 # Skip WAV headers from individual chunks, only send raw PCM
                 if audio_data[:4] == b"RIFF":
-                    # This is a WAV file, extract just the PCM data
-                    # WAV header is 44 bytes for standard PCM
                     yield audio_data[44:]
                 else:
                     yield audio_data
@@ -722,11 +742,21 @@ async def stream_audio(job_id: str) -> StreamingResponse:
                 # Timeout waiting for data
                 break
 
-        # Clean up job after streaming
-        _job_manager.remove_job(job_id)
+    def generate_audio_cached() -> Iterator[bytes]:
+        """Stream audio from cache (subsequent requests)."""
+        # Send WAV header first
+        yield _create_wav_header(sample_rate=24000)
+        # Send all cached chunks
+        yield from job.audio_cache
+
+    # Use live stream for first request, cached for subsequent
+    if not job.stream_started:
+        generator = generate_audio_live()
+    else:
+        generator = generate_audio_cached()
 
     return StreamingResponse(
-        generate_audio(),
+        generator,
         media_type="audio/wav",
         headers={
             "Cache-Control": "no-cache",
@@ -735,9 +765,69 @@ async def stream_audio(job_id: str) -> StreamingResponse:
     )
 
 
+async def download_audio(job_id: str, filename: str = "audio.wav") -> Response:
+    """Download complete audio file for a job.
+
+    This endpoint returns the full WAV file with correct headers for download.
+    Only works after generation is complete.
+
+    Args:
+        job_id: The job ID to download audio for.
+        filename: Suggested filename for download.
+
+    Returns:
+        Complete WAV audio file response.
+    """
+    job = _job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.audio_cache:
+        raise HTTPException(status_code=404, detail="No audio available")
+
+    # Combine all cached audio data
+    audio_data = b"".join(job.audio_cache)
+
+    # Create proper WAV header with actual size
+    sample_rate = 24000
+    bits_per_sample = 16
+    channels = 1
+    byte_rate = sample_rate * channels * bits_per_sample // 8
+    block_align = channels * bits_per_sample // 8
+    data_size = len(audio_data)
+    file_size = data_size + 36  # Header is 44 bytes, minus 8 for RIFF header
+
+    header = io.BytesIO()
+    header.write(b"RIFF")
+    header.write(struct.pack("<I", file_size))
+    header.write(b"WAVE")
+    header.write(b"fmt ")
+    header.write(struct.pack("<I", 16))  # fmt chunk size
+    header.write(struct.pack("<H", 1))  # PCM format
+    header.write(struct.pack("<H", channels))
+    header.write(struct.pack("<I", sample_rate))
+    header.write(struct.pack("<I", byte_rate))
+    header.write(struct.pack("<H", block_align))
+    header.write(struct.pack("<H", bits_per_sample))
+    header.write(b"data")
+    header.write(struct.pack("<I", data_size))
+
+    wav_data = header.getvalue() + audio_data
+
+    return Response(
+        content=wav_data,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(wav_data)),
+        },
+    )
+
+
 async def read_pdf_stream(
     file: UploadFile = File(...),
     language: str = Form("english"),
+    style: str = Form("technical"),
 ) -> StreamingResponse:
     """Read a PDF with streaming progress updates.
 
@@ -746,6 +836,7 @@ async def read_pdf_stream(
     Args:
         file: Uploaded PDF file.
         language: Language for TTS (english, chinese, japanese, korean).
+        style: TTS style (technical, narrative, news, casual, academic).
 
     Returns:
         Streaming response with progress events including job_id.
@@ -791,6 +882,7 @@ async def read_pdf_stream(
             text,
             _tts_engine,
             language,
+            style,
             doc_name=file.filename or "document.pdf",
             doc_type="pdf",
             page_count=page_count,
@@ -820,6 +912,7 @@ async def read_text_stream(request: TextRequest) -> StreamingResponse:
 
     text = request.text.strip()
     language = request.language if request.language in LANGUAGE_VOICES else "english"
+    style = request.style if request.style in TTS_STYLES else "technical"
 
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
@@ -842,6 +935,7 @@ async def read_text_stream(request: TextRequest) -> StreamingResponse:
             text,
             _tts_engine,
             language,
+            style,
             doc_name="Pasted Text",
             doc_type="text",
         ),
@@ -870,6 +964,7 @@ async def read_url_stream(request: UrlRequest) -> StreamingResponse:
 
     url = request.url.strip()
     language = request.language if request.language in LANGUAGE_VOICES else "english"
+    style = request.style if request.style in TTS_STYLES else "technical"
 
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
@@ -946,6 +1041,7 @@ async def read_url_stream(request: UrlRequest) -> StreamingResponse:
             text,
             _tts_engine,
             language,
+            style,
             doc_name=doc_name,
             doc_type="pdf" if is_pdf else "url",
             page_count=page_count,

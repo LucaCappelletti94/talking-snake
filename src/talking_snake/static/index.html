@@ -38,6 +38,26 @@
         <div class="container">
             <div class="input-section" id="inputSection">
                 <div class="options-row">
+                    <div class="style-selector">
+                        <span class="style-label">Style:</span>
+                        <div class="style-buttons" id="styleButtons">
+                            <button class="style-btn active" data-style="technical" title="Clear, precise reading for code and technical documentation">
+                                <i class="fa-solid fa-microchip"></i>
+                            </button>
+                            <button class="style-btn" data-style="narrative" title="Natural, engaging reading for articles and stories">
+                                <i class="fa-solid fa-book-open"></i>
+                            </button>
+                            <button class="style-btn" data-style="child_narrative" title="Playful, expressive reading for children's stories">
+                                <i class="fa-solid fa-child"></i>
+                            </button>
+                            <button class="style-btn" data-style="news" title="Authoritative, clear delivery for news and reports">
+                                <i class="fa-solid fa-newspaper"></i>
+                            </button>
+                            <button class="style-btn" data-style="academic" title="Measured, scholarly reading for papers and research">
+                                <i class="fa-solid fa-graduation-cap"></i>
+                            </button>
+                        </div>
+                    </div>
                     <div class="language-selector">
                         <span class="style-label">Language:</span>
                         <div class="style-buttons" id="languageButtons">
@@ -101,6 +121,7 @@
                         <div class="processing-progress-bar" id="processingProgressBar"></div>
                     </div>
                     <div class="control-buttons">
+                        <button class="control-btn play-btn hidden" id="streamPlayBtn" title="Play audio"><i class="fa-solid fa-play"></i></button>
                         <button class="control-btn pause-btn hidden" id="pauseBtn" title="Pause/Resume"><i class="fa-solid fa-pause"></i></button>
                         <button class="control-btn stop-btn" id="stopBtn" title="Stop generation"><i class="fa-solid fa-stop"></i></button>
                     </div>

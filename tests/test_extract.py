@@ -6,11 +6,13 @@ import pytest
 
 from talking_snake.extract import (
     TextBlock,
+    _is_caption,
     clean_text,
     clean_text_blocks,
     extract_text,
     extract_text_blocks,
     is_page_number,
+    normalize_for_tts,
 )
 
 
@@ -225,3 +227,173 @@ class TestExtractTextBlocks:
         result = extract_text_blocks(sample_pdf_bytes)
         for block in result:
             assert block.page_num >= 1
+
+
+class TestIsCaption:
+    """Tests for caption detection."""
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            # Figure captions
+            ("Figure 1: A diagram showing the process", True),
+            ("Figure 2. Results of the experiment", True),
+            ("Fig. 3 - Distribution of values", True),
+            ("Fig 4: Another caption", True),
+            # Table captions
+            ("Table 1: Summary statistics", True),
+            ("Table 2. Experimental results", True),
+            # Other caption types
+            ("Chart 1: Revenue breakdown", True),
+            ("Graph 2: Population growth", True),
+            ("Exhibit A: Contract terms", True),
+            ("Appendix B: Additional data", True),
+            # Source/note captions
+            ("Source: World Bank, 2023", True),
+            ("Sources: Multiple databases", True),
+            ("Note: Values are in millions", True),
+            ("Notes: See methodology section", True),
+            # Statistical notes
+            ("* p < 0.05", True),
+            # Not captions - regular text
+            ("The figure shows important results", False),
+            ("In Table 1, we present the data", False),
+            ("This is regular paragraph text", False),
+            ("The source of this data is unclear", False),
+            ("", False),
+        ],
+    )
+    def test_is_caption(self, text: str, expected: bool) -> None:
+        """Test caption detection with various inputs."""
+        assert _is_caption(text) == expected
+
+
+class TestNormalizeForTts:
+    """Tests for TTS text normalization."""
+
+    @pytest.mark.parametrize(
+        "input_text,expected",
+        [
+            # Citation removal - inline parenthetical
+            (
+                "Results are consistent with prior work (Smith, 2020).",
+                "Results are consistent with prior work.",
+            ),
+            (
+                "As noted (Chen, 2018; Lee et al., 2020), this is important.",
+                "As noted, this is important.",
+            ),
+            # Citation removal - author year
+            (
+                "The study found that...",
+                "The study found that...",
+            ),
+            # Author patterns should be cleaned
+            (
+                "The study by Jones and Brown found that...",
+                "The study found that...",
+            ),
+            # Figure/table references
+            (
+                "The data (see Figure 1) suggests...",
+                "The data suggests...",
+            ),
+            (
+                "As shown in Table 2, the results...",
+                "As shown in Table 2, the results...",  # Table refs without "see" preserved
+            ),
+            # Section references
+            (
+                "According to Section 2.1, we find...",
+                "we find...",
+            ),
+            (
+                "As described in Chapter 3, the method...",
+                "the method...",
+            ),
+            # DOIs and technical identifiers
+            (
+                "Available at doi: 10.1234/example.2020",
+                "Available at",
+            ),
+            (
+                "See arXiv:2301.12345v2 for details",
+                "See for details",
+            ),
+            # Volume/page info
+            (
+                "Published in Vol. 12, No. 3",
+                "Published in",
+            ),
+            (
+                "Pages 123-456",
+                "",
+            ),
+            # URLs
+            (
+                "Visit https://example.com for more",
+                "Visit for more",
+            ),
+            # Whitespace normalization
+            (
+                "Hello  world",
+                "Hello world",
+            ),
+            (
+                "Multiple   spaces   here",
+                "Multiple spaces here",
+            ),
+            # Smart quotes - converted to ASCII equivalents
+            (
+                "\u201cHello\u201d and \u2018world\u2019",
+                "\"Hello\" and 'world'",  # Straight quotes
+            ),
+            # Abbreviations
+            (
+                "e.g. this and i.e. that",
+                "for example this and that is that",
+            ),
+            # Fractions
+            (
+                "About ½ of the sample",
+                "About one half of the sample",
+            ),
+            # Math symbols
+            (
+                "x < 5 and y > 10",
+                "x less than 5 and y greater than 10",
+            ),
+            # Superscripts (Unicode)
+            (
+                "H₂O and x²",
+                "HO and x",
+            ),
+        ],
+    )
+    def test_normalize_for_tts(self, input_text: str, expected: str) -> None:
+        """Test TTS normalization with various inputs."""
+        result = normalize_for_tts(input_text)
+        # Normalize whitespace for comparison
+        result = " ".join(result.split())
+        expected = " ".join(expected.split())
+        assert result == expected
+
+    def test_preserves_regular_text(self) -> None:
+        """Test that regular prose is preserved."""
+        text = "The quick brown fox jumps over the lazy dog."
+        result = normalize_for_tts(text)
+        assert result == text
+
+    def test_handles_empty_string(self) -> None:
+        """Test that empty string returns empty string."""
+        assert normalize_for_tts("") == ""
+
+    def test_handles_newlines(self) -> None:
+        """Test that newlines are handled properly."""
+        # Single newline (mid-sentence) becomes space
+        result = normalize_for_tts("Hello\nworld")
+        assert result == "Hello world"
+
+        # Double newline (paragraph break) is preserved
+        result = normalize_for_tts("Hello.\n\nWorld.")
+        assert "Hello." in result and "World." in result
