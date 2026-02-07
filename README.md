@@ -7,11 +7,20 @@
 
 PDF and web page to speech using [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice). Upload a document or URL, get it read aloud with 9 natural voices across English, Chinese, Japanese, and Korean. Audio streams progressively while generation continues.
 
+## Deploy Your Own
+
+[![Deploy on Hugging Face Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-on-spaces-lg.svg)](https://huggingface.co/spaces/LucaCappelletti94/talking-snake?duplicate=true)
+
+Click the button above to deploy your own GPU-powered instance. You'll be prompted to create a Hugging Face account and select hardware (ZeroGPU is free, A10G is ~$1/hr).
+
+## Run Locally
+
 Requires Python 3.11+, NVIDIA GPU (~6GB VRAM), and [SoX](https://sourceforge.net/projects/sox/) (`apt install sox libsox-dev`).
 
 ```bash
 uv sync && uv run talking-snake --port 8888  # Open http://localhost:8888
 ```
+
 
 [▶️ Listen to a sample](https://github.com/LucaCappelletti94/talking-snake/raw/main/src/talking_snake/static/sample.wav)
 
