@@ -198,3 +198,45 @@ class TestAppCreation:
         """Test that app can be created without engine (uses mock)."""
         app = create_app()
         assert app is not None
+
+
+class TestLanguageParameter:
+    """Tests for language parameter handling."""
+
+    async def test_text_stream_accepts_language(self, client: AsyncClient) -> None:
+        """Test text stream endpoint accepts language parameter."""
+        response = await client.post(
+            "/api/read-text-stream",
+            json={"text": "Hello world", "language": "japanese"},
+        )
+        assert response.status_code == 200
+
+    async def test_text_stream_accepts_chinese(self, client: AsyncClient) -> None:
+        """Test text stream endpoint accepts Chinese language."""
+        response = await client.post(
+            "/api/read-text-stream",
+            json={"text": "你好世界", "language": "chinese"},
+        )
+        assert response.status_code == 200
+
+    async def test_text_stream_accepts_korean(self, client: AsyncClient) -> None:
+        """Test text stream endpoint accepts Korean language."""
+        response = await client.post(
+            "/api/read-text-stream",
+            json={"text": "Hello world", "language": "korean"},
+        )
+        assert response.status_code == 200
+
+
+class TestJobTimeout:
+    """Tests for job timeout and cleanup."""
+
+    def test_job_has_started_timestamp(self) -> None:
+        """Test that job has a started timestamp."""
+        from talking_snake.app import AudioJob
+
+        job = AudioJob("test-id")
+        import time
+
+        assert job.started <= time.time()
+        assert job.started > time.time() - 10  # Within last 10 seconds

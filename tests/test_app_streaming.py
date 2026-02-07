@@ -10,6 +10,7 @@ from talking_snake.app import (
     JobManager,
     _create_wav_header,
     _estimate_time,
+    _get_device_info,
     create_app,
 )
 from talking_snake.tts import MockTTSEngine
@@ -135,6 +136,37 @@ class TestHelperFunctions:
         chunk_count, estimated_seconds = _estimate_time("Hi")
         assert chunk_count == 1
         assert estimated_seconds > 0
+
+    def test_estimate_time_with_custom_rate(self) -> None:
+        """Test time estimation with custom seconds per char."""
+        text = "Hello"
+        chunk_count, estimated_seconds = _estimate_time(text, seconds_per_char=0.01)
+        assert estimated_seconds == pytest.approx(0.05, rel=0.1)
+
+    def test_get_device_info_returns_dict(self) -> None:
+        """Test that device info returns expected keys."""
+        info = _get_device_info()
+        assert isinstance(info, dict)
+        assert "device" in info
+        assert "device_name" in info
+        assert "memory_used_gb" in info
+        assert "memory_total_gb" in info
+        assert "batch_size" in info
+        assert "ram_used_gb" in info
+        assert "ram_total_gb" in info
+        assert "disk_free_gb" in info
+
+    def test_get_device_info_ram_values(self) -> None:
+        """Test that RAM values are reasonable."""
+        info = _get_device_info()
+        assert info["ram_total_gb"] > 0
+        assert info["ram_used_gb"] >= 0
+        assert info["ram_used_gb"] <= info["ram_total_gb"]
+
+    def test_get_device_info_disk_values(self) -> None:
+        """Test that disk free value is reasonable."""
+        info = _get_device_info()
+        assert info["disk_free_gb"] >= 0
 
 
 class TestLanguagesEndpoint:
