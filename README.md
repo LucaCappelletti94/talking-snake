@@ -16,7 +16,7 @@ Click the button above to deploy your own GPU-powered instance. You'll be prompt
 
 ## Run Locally
 
-Requires Python 3.11+, NVIDIA GPU (~6GB VRAM), and [SoX](https://sourceforge.net/projects/sox/) (`apt install sox libsox-dev`).
+Requires Python 3.11+, NVIDIA GPU (~6GB VRAM), and [SoX](https://sourceforge.net/projects/sox/) (`apt install sox libsox-dev`). The GPU will be automatically freed if the app is idle for 5+ minutes. It can also run on CPU (no GPU, but much slower).
 
 ```bash
 uv sync && uv run talking-snake --port 8888  # Open http://localhost:8888

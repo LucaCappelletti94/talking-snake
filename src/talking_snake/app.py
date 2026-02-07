@@ -436,6 +436,13 @@ def _get_device_info() -> dict:
     if _tts_engine is not None:
         info["batch_size"] = getattr(_tts_engine, "batch_size", 1)
         info["chunk_size"] = getattr(_tts_engine, "chunk_size", 800)
+        # Include timing stats
+        seconds_per_char = getattr(_tts_engine, "seconds_per_char", None)
+        if seconds_per_char is not None:
+            info["seconds_per_char"] = round(seconds_per_char, 4)
+        total_chars = getattr(_tts_engine, "total_chars_processed", 0)
+        if total_chars > 0:
+            info["total_chars_processed"] = total_chars
 
     return info
 

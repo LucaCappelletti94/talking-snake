@@ -143,8 +143,11 @@ class QwenTTSEngine(TTSEngineProtocol):
         self._lock = threading.Lock()
         self._unload_timer: threading.Timer | None = None
 
-        # Calibrated seconds per character (measured on first synthesis)
+        # Calibrated seconds per character (measured and updated over time)
         self._seconds_per_char: float | None = None
+        # Cumulative stats for running average
+        self._total_chars_processed: int = 0
+        self._total_time_spent: float = 0.0
 
         # Model will be loaded on first request (lazy loading)
         self.model = None
@@ -157,6 +160,23 @@ class QwenTTSEngine(TTSEngineProtocol):
     def seconds_per_char(self) -> float | None:
         """Return calibrated seconds per character, or None if not yet measured."""
         return self._seconds_per_char
+
+    @property
+    def total_chars_processed(self) -> int:
+        """Return total characters processed since startup."""
+        return self._total_chars_processed
+
+    def _update_timing_stats(self, chars: int, elapsed: float) -> None:
+        """Update cumulative timing statistics.
+
+        Args:
+            chars: Number of characters processed.
+            elapsed: Time taken in seconds.
+        """
+        self._total_chars_processed += chars
+        self._total_time_spent += elapsed
+        if self._total_chars_processed > 0:
+            self._seconds_per_char = self._total_time_spent / self._total_chars_processed
 
     def calibrate(self, test_text: str = "Hello, this is a calibration test.") -> float:
         """Run a calibration test to measure seconds per character.
@@ -336,6 +356,10 @@ class QwenTTSEngine(TTSEngineProtocol):
         # Type guard - model is guaranteed to be loaded after _ensure_model_loaded
         assert self.model is not None, "Model failed to load"
 
+        # Track timing for this synthesis
+        synthesis_start = time.time()
+        chars_in_text = len(text)
+
         try:
             # Split text into chunks for streaming
             chunks = self._split_text(text)
@@ -378,6 +402,9 @@ class QwenTTSEngine(TTSEngineProtocol):
                     first_chunk = False
                     yield wav_bytes
         finally:
+            # Update timing stats for future estimates
+            elapsed = time.time() - synthesis_start
+            self._update_timing_stats(chars_in_text, elapsed)
             # Schedule model unload after idle timeout
             self._schedule_unload()
 

@@ -168,6 +168,17 @@ class TestHelperFunctions:
         info = _get_device_info()
         assert info["disk_free_gb"] >= 0
 
+    def test_get_device_info_timing_stats_optional(self) -> None:
+        """Test that timing stats are optional but correct when present."""
+        info = _get_device_info()
+        # Timing stats may or may not be present depending on whether TTS engine exists
+        if "seconds_per_char" in info:
+            assert isinstance(info["seconds_per_char"], float)
+            assert info["seconds_per_char"] > 0
+        if "total_chars_processed" in info:
+            assert isinstance(info["total_chars_processed"], int)
+            assert info["total_chars_processed"] > 0
+
 
 class TestLanguagesEndpoint:
     """Tests for the languages endpoint."""

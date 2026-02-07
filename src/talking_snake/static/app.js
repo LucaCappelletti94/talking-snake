@@ -173,12 +173,17 @@ function updateDeviceInfo(info) {
         : "";
     const ramInfo = `<span class="device-memory"><i class="fa-solid fa-memory"></i> RAM: ${info.ram_used_gb}/${info.ram_total_gb}GB</span>`;
     const diskInfo = `<span class="device-memory"><i class="fa-solid fa-hard-drive"></i> ${info.disk_free_gb}GB free</span>`;
+    // Show timing stats if available
+    const timingInfo = info.seconds_per_char !== undefined
+        ? `<span class="device-timing"><i class="fa-solid fa-stopwatch"></i> ${info.seconds_per_char.toFixed(4)}s/char${info.total_chars_processed ? ` (${info.total_chars_processed.toLocaleString()} chars)` : ""}</span>`
+        : "";
     deviceInfo.innerHTML = `
         <i class="fa-solid ${icon}"></i>
         <span>${info.device_name}</span>
         ${gpuMemoryInfo}
         ${ramInfo}
         ${diskInfo}
+        ${timingInfo}
         <span class="device-ephemeral"><i class="fa-solid fa-shield-halved"></i> No files stored</span>
     `;
     deviceInfo.classList.add("visible");

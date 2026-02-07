@@ -528,6 +528,17 @@ input[type="file"] {
     font-size: 0.6rem;
 }
 
+.device-timing {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--text-muted);
+}
+
+.device-timing i {
+    font-size: 0.6rem;
+}
+
 .device-batch {
     background: var(--surface);
     padding: 0.2rem 0.5rem;
