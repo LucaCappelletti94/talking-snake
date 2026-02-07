@@ -1,0 +1,848 @@
+/**
+ * Talking Snake - Main Stylesheet
+ * A warm, accessible color scheme inspired by the talking snake logo
+ */
+
+:root {
+    /* Warm, friendly palette inspired by the talking snake logo */
+    --bg: #fff7e9;              /* Warm cream background */
+    --surface: #fff;          /* Clean white cards */
+    --primary: #d4763a;          /* Warm orange - friendly & energetic */
+    --primary-hover: #c06830;    /* Darker orange for hover */
+    --secondary: #5a8f5a;        /* Soft green - snake accent */
+    --text: #3d3425;             /* Warm dark brown - easy on eyes */
+    --text-muted: #7a6f5f;       /* Muted brown */
+    --border: #e5d9c8;           /* Warm border */
+    --success: #5a8f5a;          /* Green for success states */
+    --error: #c45a4a;            /* Soft red for errors */
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    margin: 0;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.4;
+}
+
+.main-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+    width: 100%;
+}
+
+h1 {
+    font-size: 1.75rem;
+    margin: 0 0 0.25rem;
+    color: var(--primary);
+}
+
+.subtitle {
+    color: var(--text-muted);
+    margin: 0 0 1rem;
+    font-size: 0.9rem;
+}
+
+.container {
+    max-width: 500px;
+    width: 100%;
+}
+
+/* Options Row - Style and Language selectors */
+.options-row {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Style Selector */
+.style-selector,
+.language-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.style-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.style-buttons {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.style-btn {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Language buttons use emoji flags */
+.style-btn.lang-btn {
+    font-size: 1.2rem;
+}
+
+.style-btn:hover {
+    border-color: var(--primary);
+    color: var(--text);
+}
+
+.style-btn.active {
+    background: rgb(212, 118, 58, 0.15);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Input Section - hidden during processing */
+.input-section.hidden {
+    display: none;
+}
+
+/* Processing Section - two row layout */
+.processing-section {
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    width: 100%;
+}
+
+.processing-section.visible {
+    display: flex;
+}
+
+/* Row 1: Document info */
+.processing-row-1 {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* Row 2: Status, progress, buttons */
+.processing-row-2 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Document Info - fills first row */
+.doc-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text);
+    width: 100%;
+    min-width: 0;
+}
+
+.doc-info:empty {
+    display: none;
+}
+
+.doc-info .doc-name {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.doc-info .doc-name i {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.doc-info .doc-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.doc-info .doc-pages,
+.doc-info .doc-chars {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.doc-info .doc-pages i,
+.doc-info .doc-chars i {
+    font-size: 0.7rem;
+    opacity: 0.6;
+}
+
+/* Status in processing */
+.processing-section .status {
+    padding: 0;
+    background: none;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Processing progress bar */
+.processing-progress-container {
+    flex: 1;
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 60px;
+}
+
+.processing-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary) 0%, #c06030 100%);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+/* Control buttons row */
+.control-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.control-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-btn.hidden {
+    display: none;
+}
+
+.control-btn:hover {
+    filter: brightness(1.1);
+}
+
+.pause-btn {
+    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+}
+
+.pause-btn:hover {
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+.stop-btn {
+    background: linear-gradient(135deg, var(--error), #8b3a30, var(--error));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+}
+
+.stop-btn:hover {
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+@keyframes gradient-idle {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Drop Zone */
+.drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: var(--surface);
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    border-color: var(--primary);
+    background: rgb(212, 118, 58, 0.08);
+}
+
+.drop-zone p {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+}
+
+.drop-zone .hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.drop-icon {
+    font-size: 2.5rem;
+    color: var(--primary);
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.tab {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s ease;
+}
+
+.tab:hover {
+    border-color: var(--primary);
+    color: var(--text);
+}
+
+.tab.active {
+    background: rgb(212, 118, 58, 0.12);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* URL Form */
+.url-form {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.url-form input[type="url"] {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.15s ease;
+}
+
+.url-form input[type="url"]:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.url-form input[type="url"]::placeholder {
+    color: var(--text-muted);
+}
+
+/* Text Form */
+.text-form {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.text-form textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.15s ease;
+    resize: vertical;
+    min-height: 120px;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+.text-form textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.text-form textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.text-form .hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: center;
+    margin: 0;
+}
+
+/* Buttons */
+.submit-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: filter 0.15s ease;
+    margin-bottom: 0.5rem;
+}
+
+.submit-btn:hover {
+    filter: brightness(1.1);
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+.submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: none;
+    animation: none;
+}
+
+.url-form .hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: center;
+    margin: 0;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.file-label {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: filter 0.15s ease;
+}
+
+.file-label:hover {
+    filter: brightness(1.1);
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+/* Device Info - Subtle footer-like display */
+.device-info {
+    display: none;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    opacity: 0.7;
+}
+
+.device-info.visible {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.device-info i {
+    color: var(--primary);
+    opacity: 0.8;
+}
+
+.device-memory {
+    opacity: 0.9;
+}
+
+.device-batch {
+    background: var(--surface);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+}
+
+/* Icon spacing in buttons and tabs */
+.tab i,
+.submit-btn i,
+.file-label i {
+    margin-right: 0.4rem;
+}
+
+/* Status Messages */
+.status {
+    font-size: 0.85rem;
+    display: none;
+}
+
+.status.visible {
+    display: block;
+}
+
+.status i {
+    margin-right: 0.4rem;
+}
+
+.status.loading {
+    color: var(--text-muted);
+}
+
+.status.error {
+    color: var(--error);
+}
+
+.status.success {
+    color: var(--success);
+}
+
+/* Audio Player */
+.player {
+    margin-top: 1.5rem;
+    width: 100%;
+    display: none;
+    padding: 1.25rem;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.player.visible {
+    display: block;
+}
+
+/* Hidden audio element */
+#audio {
+    display: none;
+}
+
+/* Custom Audio Player */
+.custom-player {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.player-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary), #c06030, var(--primary));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: filter 0.15s ease;
+    flex-shrink: 0;
+}
+
+.player-btn:hover {
+    filter: brightness(1.1);
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+.player-btn.volume-btn {
+    background: linear-gradient(135deg, var(--bg), #252540, var(--bg));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+}
+
+.player-btn.volume-btn:hover {
+    color: var(--text);
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+.player-btn.download-btn {
+    background: linear-gradient(135deg, var(--bg), #252540, var(--bg));
+    background-size: 200% 200%;
+    animation: gradient-idle 3s ease infinite;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+}
+
+.player-btn.download-btn:hover {
+    color: var(--primary);
+    animation: gradient-shift 0.8s ease infinite;
+}
+
+.progress-container {
+    flex: 1;
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    position: relative;
+    cursor: pointer;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.1s ease;
+    pointer-events: none;
+}
+
+.progress-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    margin: 0;
+    appearance: none;
+}
+
+.progress-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.progress-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.time-display {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 80px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.filename {
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-all;
+}
+
+/* Spinner Animation */
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--text-muted);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    padding-top: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+
+footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+footer i.fa-heart {
+    color: var(--error);
+}
+
+footer i.fa-github {
+    margin-right: 0.2rem;
+}
+
+/* Logo */
+.logo {
+    width: 250px;
+    height: auto;
+    margin-bottom: 0.75rem;
+}
+
+/* Tablet styles */
+@media (width <= 768px) {
+    body {
+        padding: 1rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .logo {
+        width: 200px;
+    }
+
+    .drop-zone {
+        padding: 1.25rem 1rem;
+    }
+
+    .tabs {
+        flex-direction: column;
+    }
+
+    .tab {
+        width: 100%;
+    }
+}
+
+/* Mobile styles */
+@media (width <= 480px) {
+    body {
+        padding: 0.75rem;
+    }
+
+    h1 {
+        font-size: 1.35rem;
+    }
+
+    .subtitle {
+        font-size: 0.8rem;
+    }
+
+    .logo {
+        width: 160px;
+    }
+
+    .drop-zone {
+        padding: 1rem;
+    }
+
+    .drop-zone p {
+        font-size: 0.9rem;
+    }
+
+    .url-form {
+        padding: 0.75rem;
+    }
+
+    .url-form input[type="url"] {
+        padding: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .submit-btn,
+    .file-label {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .filename {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.5rem;
+    }
+
+    footer {
+        font-size: 0.7rem;
+        text-align: center;
+    }
+}
+
+/* Ensure touch targets are large enough */
+@media (pointer: coarse) {
+    .tab,
+    .submit-btn,
+    .file-label {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}

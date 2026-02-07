@@ -1,0 +1,20 @@
+{
+    "name": "talking-snake-frontend",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Frontend linting for Talking Snake",
+    "scripts": {
+        "lint": "npm run lint:html && npm run lint:css && npm run lint:js",
+        "lint:html": "htmlhint src/talking_snake/static/*.html",
+        "lint:css": "stylelint src/talking_snake/static/*.css",
+        "lint:js": "eslint src/talking_snake/static/*.js"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "eslint": "^10.0.0",
+        "htmlhint": "^1.1.4",
+        "stylelint": "^17.1.1",
+        "stylelint-config-standard": "^40.0.0"
+    }
+}

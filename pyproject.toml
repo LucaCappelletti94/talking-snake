@@ -1,0 +1,111 @@
+[project]
+name = "talking-snake"
+version = "0.1.0"
+description = "PDF and web page to speech server using Qwen3-TTS - listen to any content"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Luca" }]
+keywords = ["tts", "pdf", "speech", "audiobook", "text-to-speech", "listening"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+
+# System dependencies (not installable via pip):
+# - sox: Audio processing tool required by qwen-tts
+#   Ubuntu/Debian: sudo apt-get install sox libsox-dev
+#   macOS: brew install sox
+#   Fedora: sudo dnf install sox sox-devel
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "qwen-tts>=0.1.1",
+    "torch>=2.5.0",
+    "pdfminer.six>=20260107",
+    "python-multipart>=0.0.12",
+    "jinja2>=3.1.4",
+    "httpx>=0.27.0",
+    "trafilatura>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
+    "pre-commit>=4.0.0",
+]
+# Flash Attention for ~2x faster inference (requires CUDA 11.6+)
+# Install separately: pip install flash-attn --no-build-isolation
+fast = [
+    "flash-attn>=2.5.0",
+]
+
+[project.scripts]
+talking-snake = "talking_snake.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/talking_snake"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (run with --run-slow)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# PDF xref tables require trailing whitespace per spec
+"tests/conftest.py" = ["W291"]
+
+[tool.coverage.run]
+source = ["src/talking_snake"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "class QwenTTSEngine",
+    "def _audio_to_wav",
+    "def _split_text",
+    "import torch",
+    "from qwen_tts",
+]
+show_missing = true
+skip_covered = true
+fail_under = 70
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
