@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Publish
 
 on:
   release:
@@ -8,19 +8,52 @@ on:
       publish_target:
         description: 'Publish target'
         required: true
-        default: 'testpypi'
+        default: 'huggingface'
         type: choice
         options:
+          - huggingface
           - testpypi
           - pypi
 
 jobs:
-  # Run CI checks first
+  # Run CI checks first (skip for HF-only deploys for speed)
   ci:
+    if: github.event_name == 'release' || github.event.inputs.publish_target != 'huggingface'
     uses: ./.github/workflows/ci.yml
+
+  # Deploy to Hugging Face Spaces
+  deploy-huggingface:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_target == 'huggingface'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git clone https://huggingface.co/spaces/LucaCappelletti94/talking-snake hf-space
+          cd hf-space
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+
+          # Copy updated files
+          cp -r ../src/talking_snake/* src/talking_snake/
+          cp ../pyproject.toml .
+          cp ../Dockerfile .
+          cp ../README_HF.md README.md
+          cp ../LICENSE .
+
+          # Commit and push
+          git add -A
+          git diff --staged --quiet || git commit -m "Deploy from GitHub: ${{ github.sha }}"
+          git push https://LucaCappelletti94:$HF_TOKEN@huggingface.co/spaces/LucaCappelletti94/talking-snake main
 
   build:
     needs: ci
+    if: github.event_name == 'release' || github.event.inputs.publish_target != 'huggingface'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
