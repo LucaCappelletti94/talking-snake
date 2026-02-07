@@ -14,8 +14,6 @@ Requires Python 3.11+, NVIDIA GPU (~6GB VRAM), and [SoX](https://sourceforge.net
 uv sync && uv run talking-snake --port 8888  # Open http://localhost:8888
 ```
 
-No GPU? Use [GitHub Codespaces](https://codespaces.new/LucaCappelletti94/talking-snake?quickstart=1).
-
 [▶️ Listen to a sample](https://github.com/LucaCappelletti94/talking-snake/raw/main/src/talking_snake/static/sample.wav)
 
 ## License
