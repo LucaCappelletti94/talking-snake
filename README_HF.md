@@ -7,7 +7,7 @@ sdk: docker
 pinned: false
 license: mit
 app_port: 7860
-hardware: zero-a10g
+suggested_hardware: t4-small
 ---
 
 # Talking Snake

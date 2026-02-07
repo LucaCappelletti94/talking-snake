@@ -11,7 +11,7 @@ PDF and web page to speech using [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-T
 
 [![Deploy on Hugging Face Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-on-spaces-lg.svg)](https://huggingface.co/spaces/LucaCappelletti94/talking-snake?duplicate=true)
 
-Click the button above to deploy your own GPU-powered instance. You'll be prompted to create a Hugging Face account and select hardware (ZeroGPU is free, A10G is ~$1/hr).
+Click the button above to deploy your own GPU-powered instance. You'll be prompted to create a Hugging Face account and select hardware (T4 ~$0.40/hr, A10G ~$1.05/hr).
 
 ## Run Locally
 
