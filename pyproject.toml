@@ -1,6 +1,6 @@
 [project]
 name = "talking-snake"
-version = "0.1.0"
+version = "0.1.1"
 description = "Just a talking snake that reads PDFs and web pages aloud."
 readme = "README.md"
 license = { text = "MIT" }
@@ -44,11 +44,6 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.14.0",
     "pre-commit>=4.0.0",
-]
-# Flash Attention for ~2x faster inference (requires CUDA 11.6+)
-# Install separately: pip install flash-attn --no-build-isolation
-fast = [
-    "flash-attn>=2.5.0",
 ]
 
 [project.scripts]

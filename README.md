@@ -19,8 +19,31 @@ Click the button above to deploy your own GPU-powered instance. You'll be prompt
 Requires Python 3.11+, NVIDIA GPU (~6GB VRAM), and [SoX](https://sourceforge.net/projects/sox/) (`apt install sox libsox-dev`). The GPU will be automatically freed if the app is idle for 5+ minutes. It can also run on CPU (no GPU, but much slower).
 
 ```bash
-uv sync && uv run talking-snake --port 8888  # Open http://localhost:8888
+uv sync && uv run --no-sync talking-snake --port 8888  # Open http://localhost:8888
 ```
+
+### Flash Attention (Optional, ~2x faster)
+
+Flash Attention requires matching your CUDA driver version. Check yours with `nvidia-smi` (top right shows "CUDA Version").
+
+1. Find a prebuilt wheel at [flashattn.dev](https://flashattn.dev/#finder) matching your:
+   - CUDA version (e.g., cu130 for CUDA 13.0)
+   - PyTorch version (e.g., torch2.10)
+   - Python version (e.g., cp312 for Python 3.12)
+
+2. Install matching torch, torchaudio, and flash-attn:
+
+   ```bash
+   # Example for CUDA 13.0 + PyTorch 2.10 + Python 3.12
+   uv pip install torch==2.10.0+cu130 torchaudio==2.10.0+cu130 --index-url https://download.pytorch.org/whl/cu130
+   uv pip install <flash-attn-wheel-url>
+   ```
+
+3. Run with `--no-sync` to prevent uv from removing the manually installed packages:
+
+   ```bash
+   uv run --no-sync talking-snake --port 8888
+   ```
 
 [▶️ Listen to a sample](https://github.com/LucaCappelletti94/talking-snake/raw/main/src/talking_snake/static/sample.wav)
 
