@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import threading
+import time
 import wave
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -66,9 +68,13 @@ LANGUAGE_VOICES: dict[str, str] = {
 # 1200 chars provides good balance for natural speech flow
 DEFAULT_CHUNK_SIZE = 1200
 
+# Idle timeout before unloading model from GPU (seconds)
+# Set to 0 to disable auto-unloading
+IDLE_TIMEOUT = 300  # 5 minutes
+
 
 class QwenTTSEngine(TTSEngineProtocol):
-    """TTS engine using Qwen3-TTS model."""
+    """TTS engine using Qwen3-TTS model with automatic GPU memory management."""
 
     # Available voices for CustomVoice model:
     # Chinese: Vivian, Serena, Uncle_Fu, Dylan (Beijing), Eric (Sichuan)
@@ -94,6 +100,7 @@ class QwenTTSEngine(TTSEngineProtocol):
         device: str = "cuda",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         model_name: str = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+        idle_timeout: int = IDLE_TIMEOUT,
     ) -> None:
         """Initialize the TTS engine.
 
@@ -114,7 +121,6 @@ class QwenTTSEngine(TTSEngineProtocol):
         import warnings
 
         import torch
-        from qwen_tts import Qwen3TTSModel
 
         # Suppress the pad_token_id warning from transformers
         logging.getLogger("transformers.generation.utils").setLevel(logging.ERROR)
@@ -126,32 +132,121 @@ class QwenTTSEngine(TTSEngineProtocol):
         self.chunk_size = chunk_size
         self._sample_rate = 24000
         self._batch_size = 1  # Will be calculated after model loads
+        self._model_name = model_name
+        self._dtype = torch.bfloat16 if device == "cuda" else torch.float32
+        self._attn_impl = "flash_attention_2" if device == "cuda" else "eager"
 
-        # Determine dtype based on device
-        dtype = torch.bfloat16 if device == "cuda" else torch.float32
+        # Idle timeout management
+        self._idle_timeout = idle_timeout
+        self._last_activity = time.time()
+        self._model_loaded = False
+        self._lock = threading.Lock()
+        self._unload_timer: threading.Timer | None = None
 
-        # Try to use flash attention on CUDA
-        attn_impl = "flash_attention_2" if device == "cuda" else "eager"
+        # Model will be loaded on first request (lazy loading)
+        self.model = None
+
+        # Load model immediately if no idle timeout (always keep loaded)
+        if idle_timeout == 0:
+            self._load_model()
+
+    def _load_model(self) -> None:
+        """Load the model onto GPU or CPU."""
+        if self._model_loaded:
+            return
+
+        import torch
+        from qwen_tts import Qwen3TTSModel
+
+        device_name = "GPU" if self.device == "cuda" else "CPU"
+        print(f"🔄 Loading TTS model onto {device_name}...")
+        start = time.time()
+
+        # Check if CUDA is actually available when requested
+        if self.device == "cuda" and not torch.cuda.is_available():
+            print("⚠️  CUDA requested but not available, falling back to CPU")
+            self.device = "cpu"
+            self._dtype = torch.float32
+            self._attn_impl = "eager"
+            device_name = "CPU"
 
         try:
             self.model = Qwen3TTSModel.from_pretrained(
-                model_name,
-                device_map=device,
-                dtype=dtype,
-                attn_implementation=attn_impl,
+                self._model_name,
+                device_map=self.device,
+                dtype=self._dtype,
+                attn_implementation=self._attn_impl,
             )
         except Exception:
             # Fallback without flash attention
             self.model = Qwen3TTSModel.from_pretrained(
-                model_name,
-                device_map=device,
-                dtype=dtype,
+                self._model_name,
+                device_map=self.device,
+                dtype=self._dtype,
             )
 
+        self._model_loaded = True
+
         # Calculate optimal batch size based on available VRAM
-        if device == "cuda":
+        if self.device == "cuda":
             self._batch_size = self._calculate_batch_size()
             print(f"   Batch size: {self._batch_size} (based on available VRAM)")
+
+        elapsed = time.time() - start
+        print(f"✅ Model loaded in {elapsed:.1f}s")
+
+    def _unload_model(self) -> None:
+        """Unload the model from GPU to free memory."""
+        with self._lock:
+            if not self._model_loaded or self.model is None:
+                return
+
+            import gc
+
+            import torch
+
+            print("💤 Unloading TTS model from GPU (idle timeout)...")
+
+            # Delete model and clear references
+            del self.model
+            self.model = None
+            self._model_loaded = False
+
+            # Force garbage collection and clear CUDA cache
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
+            print("✅ GPU memory freed")
+
+    def _schedule_unload(self) -> None:
+        """Schedule model unload after idle timeout."""
+        if self._idle_timeout <= 0:
+            return
+
+        # Cancel existing timer
+        if self._unload_timer is not None:
+            self._unload_timer.cancel()
+
+        # Schedule new unload
+        self._unload_timer = threading.Timer(self._idle_timeout, self._unload_model)
+        self._unload_timer.daemon = True
+        self._unload_timer.start()
+
+    def _ensure_model_loaded(self) -> None:
+        """Ensure model is loaded before use."""
+        with self._lock:
+            self._last_activity = time.time()
+
+            # Cancel any pending unload
+            if self._unload_timer is not None:
+                self._unload_timer.cancel()
+                self._unload_timer = None
+
+            # Load model if not loaded
+            if not self._model_loaded:
+                self._load_model()
 
     def _calculate_batch_size(self) -> int:
         """Calculate optimal batch size based on available GPU memory.
@@ -206,46 +301,56 @@ class QwenTTSEngine(TTSEngineProtocol):
         if not text.strip():
             return
 
-        # Split text into chunks for streaming
-        chunks = self._split_text(text)
+        # Ensure model is loaded (lazy loading with idle timeout)
+        self._ensure_model_loaded()
 
-        # First chunk includes WAV header
-        first_chunk = True
+        # Type guard - model is guaranteed to be loaded after _ensure_model_loaded
+        assert self.model is not None, "Model failed to load"
 
-        # Process chunks in batches for GPU efficiency
-        batch_size = self._batch_size
+        try:
+            # Split text into chunks for streaming
+            chunks = self._split_text(text)
 
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
+            # First chunk includes WAV header
+            first_chunk = True
 
-            # Filter empty chunks
-            batch = [c for c in batch if c.strip()]
-            if not batch:
-                continue
+            # Process chunks in batches for GPU efficiency
+            batch_size = self._batch_size
 
-            # Always use batched call for consistent GPU memory allocation
-            # Use professional narration style for clear, authoritative delivery
-            batch_instruct = (
-                [PROFESSIONAL_STYLE] * len(batch) if len(batch) > 1 else PROFESSIONAL_STYLE
-            )
-            audios, sr = self.model.generate_custom_voice(
-                text=batch if len(batch) > 1 else batch[0],
-                speaker=[self.voice] * len(batch) if len(batch) > 1 else self.voice,
-                instruct=batch_instruct,
-                # Use lower temperature for more stable, consistent voice
-                temperature=0.7,
-                repetition_penalty=1.1,
-            )
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i : i + batch_size]
 
-            # Ensure audios is a list for consistent iteration
-            if len(batch) == 1:
-                audios = [audios]
+                # Filter empty chunks
+                batch = [c for c in batch if c.strip()]
+                if not batch:
+                    continue
 
-            # Yield each audio chunk in order
-            for audio in audios:
-                wav_bytes = self._audio_to_wav(audio, sr, include_header=first_chunk)
-                first_chunk = False
-                yield wav_bytes
+                # Always use batched call for consistent GPU memory allocation
+                # Use professional narration style for clear, authoritative delivery
+                batch_instruct = (
+                    [PROFESSIONAL_STYLE] * len(batch) if len(batch) > 1 else PROFESSIONAL_STYLE
+                )
+                audios, sr = self.model.generate_custom_voice(
+                    text=batch if len(batch) > 1 else batch[0],
+                    speaker=[self.voice] * len(batch) if len(batch) > 1 else self.voice,
+                    instruct=batch_instruct,
+                    # Use lower temperature for more stable, consistent voice
+                    temperature=0.7,
+                    repetition_penalty=1.1,
+                )
+
+                # Ensure audios is a list for consistent iteration
+                if len(batch) == 1:
+                    audios = [audios]
+
+                # Yield each audio chunk in order
+                for audio in audios:
+                    wav_bytes = self._audio_to_wav(audio, sr, include_header=first_chunk)
+                    first_chunk = False
+                    yield wav_bytes
+        finally:
+            # Schedule model unload after idle timeout
+            self._schedule_unload()
 
     def _split_text(self, text: str, max_chars: int | None = None) -> list[str]:
         """Split text into chunks suitable for TTS.

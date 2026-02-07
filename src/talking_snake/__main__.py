@@ -45,9 +45,9 @@ def main() -> int:
     parser.add_argument(
         "--device",
         type=str,
-        default="cuda",
-        choices=["cuda", "cpu"],
-        help="Device to run the TTS model on (default: cuda)",
+        default="auto",
+        choices=["auto", "cuda", "cpu"],
+        help="Device to run the TTS model on (default: auto, detects GPU)",
     )
     parser.add_argument(
         "--reload",
@@ -57,10 +57,26 @@ def main() -> int:
 
     args = parser.parse_args()
 
+    # Auto-detect device if set to 'auto'
+    device = args.device
+    if device == "auto":
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                device = "cuda"
+                print("🎮 GPU detected, using CUDA")
+            else:
+                device = "cpu"
+                print("💻 No GPU detected, using CPU (slower but works!)")
+        except ImportError:
+            device = "cpu"
+            print("💻 PyTorch not available for detection, using CPU")
+
     print("🚀 Starting Reader server...")
     print(f"   Language: {args.language}")
     print(f"   Voice:    {args.voice or 'auto'}")
-    print(f"   Device:   {args.device}")
+    print(f"   Device:   {device}")
     print(f"   URL:      http://{args.host}:{args.port}")
     print()
 
@@ -76,7 +92,7 @@ def main() -> int:
         tts_engine = QwenTTSEngine(
             voice=args.voice,
             language=args.language,
-            device=args.device,
+            device=device,
         )
     except Exception as e:
         print(f"❌ Failed to load TTS model: {e}", file=sys.stderr)
